@@ -1,0 +1,7 @@
+/.settings
+/frameworks
+/runtime
+/simulator
+.project
+config.json
+.cocos-project.json
