@@ -4,11 +4,9 @@ local utils = require "utils"
 local scheduler = require ("scheduler") -- 定时器
 local layer 
 
-function MainScene:onKeyPressed(keyCode, event)
-	if keyCode == cc.KeyCode.KEY_SPACE then
-		self:InitBoard()
-	end
+local rectLen = display.height/4
 
+function MainScene:onKeyPressed(keyCode, event)
 	if keyCode == cc.KeyCode.KEY_LEFT_ARROW then
 		self:OnLeft()
 		self:AfterOperate(1)
@@ -34,8 +32,8 @@ local BoardData = {} -- 面板数据
 local NumLabels = {} -- 数字组件
 
 local function createNum(layer, idx, idy)
-	local cx = (idx-1)*150 +75 
-	local cy = (idy-1)*150 +75 
+	local cx = (idx-1)*rectLen +rectLen/2 
+	local cy = (idy-1)*rectLen +rectLen/2 
 	local label = cc.Label:createWithSystemFont("", "Arial", 40)
 	label:move(cx, cy)
 	label:addTo(layer) 	
@@ -182,13 +180,14 @@ end
 function MainScene:InitBoard()
 	local color = cc.c4b(255, 255, 0, 50)
     layer = cc.LayerColor:create(color)
-	layer:setContentSize(cc.size(600, 600))
+	layer:setContentSize(cc.size(display.height, display.height))
 	layer:setPosition(cc.p(0, 0))
 	self:addChild(layer)
 	
 	for i = 1, 4 do 
 		for j = 1, 4 do
-			createRect(layer, (i-1)*150, (j-1)*150, i*150, j*150)
+			print("draw rect ---------------------", i, j)
+			createRect(layer, (i-1)*rectLen, (j-1)*rectLen, i*rectLen, j*rectLen)
 		end
 	end
 
@@ -281,6 +280,41 @@ function MainScene:OnDown()
 	end
 end	
 
+local firstX = 0
+local firstY = 0
+local function onTouchBegan(touch, event)
+	local beginPoint = touch:getLocation()
+	firstX = beginPoint.x
+	firstY = beginPoint.y
+end 
+
+local function onTouchMoved(touch, event)
+	return;
+end 
+
+local function onTouchEnded(touch, event)
+	local endPoint = touch:getLocation() 
+	endX = firstX - endPoint.x
+	endY = firstY - endPoint.y
+	
+	if math.abs(endX) > math.abs(endY) then 
+		if endX > 0 then 
+			MainScene:OnLeft()
+		else 
+			MainScene:OnRight()
+		end	
+	else 
+		if endY > 0 then 
+			MainScene:OnDown()
+		else 
+			MainScene:OnUp()
+		end	
+	end 
+end 
+
+local function onTouchCancelled(touch, event)
+end 
+
 function MainScene:onCreate()
 	--[[
     --add background image
@@ -289,6 +323,8 @@ function MainScene:onCreate()
         :addTo(self)
 	-- todo: 增加logo界面
 	--]]
+	
+	self:InitBoard()
 
 	local dispatcher = cc.Director:getInstance():getEventDispatcher()
 	local listener = cc.EventListenerKeyboard:create()
@@ -296,7 +332,7 @@ function MainScene:onCreate()
 	dispatcher:addEventListenerWithSceneGraphPriority(listener, self)
 
 	-- todo : 手机触摸事件
-	--[[
+	-- [[
 		local listener1 = cc.EventListenerTouchOneByOne:create()
 		listener1:registerScriptHandler(onTouchBegan, cc.Handler.EVENT_TOUCH_BEGAN)
 		listener1:registerScriptHandler(onTouchMoved, cc.Handler.EVENT_TOUCH_MOVED)
