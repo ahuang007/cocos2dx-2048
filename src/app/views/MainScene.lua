@@ -153,7 +153,7 @@ function MainScene:AfterOperate(num)
 	-- 新出来的数字 延迟显示
 	scheduler.performWithDelayGlobal(function() -- 定时器:只执行一次
 		self:AddNum(num)
-	end, 0.2)
+	end, 0.4)
 end
 
 local function MergeArr(arr)
@@ -186,7 +186,6 @@ function MainScene:InitBoard()
 	
 	for i = 1, 4 do 
 		for j = 1, 4 do
-			print("draw rect ---------------------", i, j)
 			createRect(layer, (i-1)*rectLen, (j-1)*rectLen, i*rectLen, j*rectLen)
 		end
 	end
@@ -282,38 +281,51 @@ end
 
 local firstX = 0
 local firstY = 0
-local function onTouchBegan(touch, event)
+function MainScene:onTouchBegan(touch, event)
+	-- 纪录触摸起始点坐标
 	local beginPoint = touch:getLocation()
 	firstX = beginPoint.x
 	firstY = beginPoint.y
+	print("firstX, firstY", firstX, firstY)
+	return true
 end 
 
-local function onTouchMoved(touch, event)
-	return;
+function MainScene:onTouchMoved(touch, event)
+	return true
 end 
 
-local function onTouchEnded(touch, event)
-	local endPoint = touch:getLocation() 
-	endX = firstX - endPoint.x
-	endY = firstY - endPoint.y
-	
-	if math.abs(endX) > math.abs(endY) then 
+function MainScene:onTouchEnded(touch, event)
+	-- 纪录触摸终点坐标
+	local endPoint = touch:getLocation()
+	local endX = firstX - endPoint.x
+	local endY = firstY - endPoint.y
+
+	if math.abs(endX) > math.abs(endY) then -- 看是横向移动大还是纵向移动大
 		if endX > 0 then 
-			MainScene:OnLeft()
+			self:OnLeft()
 		else 
-			MainScene:OnRight()
+			self:OnRight()
 		end	
 	else 
 		if endY > 0 then 
-			MainScene:OnDown()
+			self:OnDown()
 		else 
-			MainScene:OnUp()
+			self:OnUp()
 		end	
-	end 
+	end
+	self:AfterOperate(1)
 end 
 
-local function onTouchCancelled(touch, event)
-end 
+function MainScene:onTouchCancelled(touch, event)
+end
+
+local function onRelease(keyCode, event)
+	if keyCode == cc.KeyCode.KEY_BACK then
+		cc.Director:getInstance():endToLua()
+	elseif keyCode == cc.KeyCode.KEY_HOME then
+		cc.Director:getInstance():endToLua()
+	end	
+end
 
 function MainScene:onCreate()
 	--[[
@@ -325,20 +337,21 @@ function MainScene:onCreate()
 	--]]
 	
 	self:InitBoard()
-
 	local dispatcher = cc.Director:getInstance():getEventDispatcher()
+	-- [[
 	local listener = cc.EventListenerKeyboard:create()
 	listener:registerScriptHandler(function(keyCode, event) self:onKeyPressed(keyCode, event) end, cc.Handler.EVENT_KEYBOARD_PRESSED)
+	listener:registerScriptHandler(onRelease, cc.Handler.EVENT_KEYBOARD_RELEASED) -- 响应安卓返回键
 	dispatcher:addEventListenerWithSceneGraphPriority(listener, self)
-
-	-- todo : 手机触摸事件
+	--]]
+	
 	-- [[
-		local listener1 = cc.EventListenerTouchOneByOne:create()
-		listener1:registerScriptHandler(onTouchBegan, cc.Handler.EVENT_TOUCH_BEGAN)
-		listener1:registerScriptHandler(onTouchMoved, cc.Handler.EVENT_TOUCH_MOVED)
-		listener1:registerScriptHandler(onTouchEnded, cc.Handler.EVENT_TOUCH_ENDED)
-		listener1:registerScriptHandler(onTouchCancelled, cc.Handler.EVENT_TOUCH_CANCELLED)
-		self:getEventDispatcher():addEventListenerWithSceneGraphPriority(listener1, self)
+	local listener1 = cc.EventListenerTouchOneByOne:create()
+	listener1:registerScriptHandler(function(touch, event) return self:onTouchBegan(touch, event) end, cc.Handler.EVENT_TOUCH_BEGAN)
+	listener1:registerScriptHandler(function(touch, event) return self:onTouchMoved(touch, event) end, cc.Handler.EVENT_TOUCH_MOVED)
+	listener1:registerScriptHandler(function(touch, event) return self:onTouchEnded(touch, event) end, cc.Handler.EVENT_TOUCH_ENDED)
+	listener1:registerScriptHandler(function(touch, event) return self:onTouchCancelled(touch, event) end, cc.Handler.EVENT_TOUCH_CANCELLED)
+	dispatcher:addEventListenerWithSceneGraphPriority(listener1, self)
 	--]]
 end
 
