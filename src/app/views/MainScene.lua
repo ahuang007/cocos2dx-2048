@@ -2,7 +2,9 @@
 local MainScene = class("MainScene", cc.load("mvc").ViewBase)
 local utils = require "utils"
 local scheduler = require ("scheduler") -- 定时器
+local json -- todo cjson库
 local layer 
+local scoreLayer
 
 local rectLen = display.height/4
 
@@ -31,29 +33,39 @@ end
 local BoardData = {} -- 面板数据
 local NumLabels = {} -- 数字组件
 
-local function createNum(layer, idx, idy)
+local function createNum(layer, idx, idy, num)
 	local cx = (idx-1)*rectLen +rectLen/2 
 	local cy = (idy-1)*rectLen +rectLen/2 
-	local label = cc.Label:createWithSystemFont("", "Arial", 40)
+	local numstr = num ~= 0 and tostring(num) or "" 
+	local label = cc.Label:createWithSystemFont(numstr, "Arial", 40)
 	label:move(cx, cy)
 	label:addTo(layer) 	
 	return label
 end
 
-local function InitBoardData()
+local function InitBoardData(boarddata)
 	for i = 1, 4 do 
 		BoardData[i] = {}
 		for j = 1, 4 do
-			BoardData[i][j] = 0
+			BoardData[i][j] = boarddata and boarddata[i][j] or 0
 		end
 	end
 end
 
-local function InitNumLabels()
+local function createRect(layer, x1, y1, x2, y2)
+    local rect = cc.rect(x1,y1,x2,y2)
+    local draw = cc.DrawNode:create()
+    draw:drawRect(cc.p(rect.x,rect.y), cc.p(rect.x+rect.width,rect.y+rect.height), cc.c4f(1,1,0,1))
+    layer:addChild(draw)
+end
+
+local function InitNumLabels(boarddata)
 	for i = 1, 4 do 
 		NumLabels[i] = {}
 		for j = 1, 4 do
-			NumLabels[i][j] = createNum(layer, i, j)
+			createRect(layer, (i-1)*rectLen, (j-1)*rectLen, i*rectLen, j*rectLen)
+			local num = boarddata and boarddata[i][j] or 0
+			NumLabels[i][j] = createNum(layer, i, j, num)
 		end
 	end
 end	
@@ -72,13 +84,6 @@ local function GenNewNum(num)
 		BoardData[v[1]][v[2]] =  2 -- todo: 当最大数增大 这个值会变化
 	end
 end 
-
-local function createRect(layer, x1, y1, x2, y2)
-    local rect = cc.rect(x1,y1,x2,y2)
-    local draw = cc.DrawNode:create()
-    draw:drawRect(cc.p(rect.x+rect.width,rect.y+rect.height), cc.p(rect.x,rect.y), cc.c4f(1,1,0,1))
-    layer:addChild(draw)
-end
 
 function MainScene:DrawBoard(layer)
 	for i = 1, 4 do 
@@ -150,10 +155,8 @@ end
 
 function MainScene:AfterOperate(num)
 	self:DrawBoard(layer)
-	-- 新出来的数字 延迟显示
-	scheduler.performWithDelayGlobal(function() -- 定时器:只执行一次
-		self:AddNum(num)
-	end, 0.4)
+	-- 新出来的数字 延迟0.5s显示
+	scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.5) -- 定时器:只执行一次
 end
 
 local function MergeArr(arr)
@@ -177,22 +180,24 @@ local function MergeArr(arr)
 	end	
 end
 
-function MainScene:InitBoard()
+function MainScene:InitBoard(boarddata)
 	local color = cc.c4b(255, 255, 0, 50)
     layer = cc.LayerColor:create(color)
 	layer:setContentSize(cc.size(display.height, display.height))
 	layer:setPosition(cc.p(0, 0))
 	self:addChild(layer)
 	
-	for i = 1, 4 do 
-		for j = 1, 4 do
-			createRect(layer, (i-1)*rectLen, (j-1)*rectLen, i*rectLen, j*rectLen)
-		end
-	end
+	local color1 = cc.c4b(255, 255, 0, 100)
+    scoreLayer = cc.LayerColor:create(color1)
+	scoreLayer:setContentSize(cc.size(display.width - display.height, display.height))
+	scoreLayer:setPosition(cc.p(display.height, 0))
+	self:addChild(scoreLayer, 10)
 
-	InitBoardData()
-	InitNumLabels()
-	self:AfterOperate(2)
+	InitBoardData(boarddata)
+	InitNumLabels(boarddata)
+	if not boarddata then 
+		self:AfterOperate(2)
+	end
 end
 
 function MainScene:OnLeft()
@@ -286,7 +291,6 @@ function MainScene:onTouchBegan(touch, event)
 	local beginPoint = touch:getLocation()
 	firstX = beginPoint.x
 	firstY = beginPoint.y
-	print("firstX, firstY", firstX, firstY)
 	return true
 end 
 
@@ -319,40 +323,83 @@ end
 function MainScene:onTouchCancelled(touch, event)
 end
 
+local function encodedata(boarddata)
+	local arr = {}
+	for i = 1, 4 do 
+		for j = 1, 4 do 
+			table.insert(arr, boarddata[i][j])
+		end 
+	end 	
+	return table.concat(arr, ",")
+end 
+
+local function decodedata(str)
+	local boarddata = {}
+	local arr = utils.split(str, ",")
+	for i = 1, 4 do 
+		boarddata[i] = {}
+		for j = 1, 4 do 
+			table.insert(boarddata[i], tonumber(arr[(i-1)*4+j]))
+		end 
+	end 
+	return boarddata
+end 
+
+local function saveBoardData()
+	local docpath = cc.FileUtils:getInstance():getWritablePath().."board.txt"
+	local f = assert(io.open(docpath, 'w'))
+	local str = encodedata(BoardData)
+	f:write(str)
+end
+
+local function loadBoardData()
+	local docpath = cc.FileUtils:getInstance():getWritablePath().."board.txt"
+	local isexit = cc.FileUtils:getInstance():isFileExist(docpath)
+	if isexit then
+		local str = cc.FileUtils:getInstance():getStringFromFile(docpath)
+		return decodedata(str)
+	else 
+		return nil 
+	end	
+end
+
 local function onRelease(keyCode, event)
-	if keyCode == cc.KeyCode.KEY_BACK then
+	if keyCode == cc.KeyCode.KEY_BACK then	
+		saveBoardData()
 		cc.Director:getInstance():endToLua()
 	elseif keyCode == cc.KeyCode.KEY_HOME then
+		saveBoardData()
+		--cc.Director:getInstance():endToLua()
+	elseif keyCode == cc.KeyCode.KEY_Q then
+		saveBoardData()
 		cc.Director:getInstance():endToLua()
 	end	
 end
 
 function MainScene:onCreate()
-	--[[
+	-- todo: 增加logo界面 间隔1s消失掉
     --add background image
+	--[[
     display.newSprite("HelloWorld.png")
         :move(display.center)
         :addTo(self)
-	-- todo: 增加logo界面
 	--]]
-	
-	self:InitBoard()
+	local olddata = loadBoardData()
+	self:InitBoard(olddata)
 	local dispatcher = cc.Director:getInstance():getEventDispatcher()
-	-- [[
+	-- 键盘事件
 	local listener = cc.EventListenerKeyboard:create()
 	listener:registerScriptHandler(function(keyCode, event) self:onKeyPressed(keyCode, event) end, cc.Handler.EVENT_KEYBOARD_PRESSED)
 	listener:registerScriptHandler(onRelease, cc.Handler.EVENT_KEYBOARD_RELEASED) -- 响应安卓返回键
 	dispatcher:addEventListenerWithSceneGraphPriority(listener, self)
-	--]]
-	
-	-- [[
+		
+	-- 触摸事件
 	local listener1 = cc.EventListenerTouchOneByOne:create()
 	listener1:registerScriptHandler(function(touch, event) return self:onTouchBegan(touch, event) end, cc.Handler.EVENT_TOUCH_BEGAN)
 	listener1:registerScriptHandler(function(touch, event) return self:onTouchMoved(touch, event) end, cc.Handler.EVENT_TOUCH_MOVED)
 	listener1:registerScriptHandler(function(touch, event) return self:onTouchEnded(touch, event) end, cc.Handler.EVENT_TOUCH_ENDED)
 	listener1:registerScriptHandler(function(touch, event) return self:onTouchCancelled(touch, event) end, cc.Handler.EVENT_TOUCH_CANCELLED)
 	dispatcher:addEventListenerWithSceneGraphPriority(listener1, self)
-	--]]
 end
 
 return MainScene

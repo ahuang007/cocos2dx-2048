@@ -46,4 +46,23 @@ function utils.get_random_sublist(array, n)
     return r
 end
 
+function utils.split(str, split)
+    local list = {}
+    local pos = 1
+    if string.find("", split, 1) then -- this would result in endless loops
+		error("split matches empty string!")
+    end
+    while true do
+        local first, last = string.find(str, split, pos)
+        if first then
+            table.insert(list, string.sub(str, pos, first - 1))
+            pos = last + 1
+        else
+            table.insert(list, string.sub(str, pos))
+            break
+        end
+    end
+    return list
+end
+
 return utils
