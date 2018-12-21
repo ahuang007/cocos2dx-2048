@@ -5,6 +5,8 @@ local scheduler = require ("scheduler") -- 定时器
 local json -- todo cjson库
 local layer 
 local scoreLayer
+local MaxScoreLabel
+local CurScoreLabel
 
 local rectLen = display.height/4
 
@@ -30,6 +32,7 @@ function MainScene:onKeyPressed(keyCode, event)
 	end
 end
 
+local MaxScore = 0
 local BoardData = {} -- 面板数据
 local NumLabels = {} -- 数字组件
 
@@ -52,18 +55,25 @@ local function InitBoardData(boarddata)
 	end
 end
 
-local function createRect(layer, x1, y1, x2, y2)
-    local rect = cc.rect(x1,y1,x2,y2)
-    local draw = cc.DrawNode:create()
-    draw:drawRect(cc.p(rect.x,rect.y), cc.p(rect.x+rect.width,rect.y+rect.height), cc.c4f(1,1,0,1))
-    layer:addChild(draw)
+local function createLine(layer, x1, y1, x2, y2)	
+	local draw = cc.DrawNode:create()
+	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 5, cc.c4f(1,1,0,1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
+	layer:addChild(draw)
 end
 
+
 local function InitNumLabels(boarddata)
+	for i = 1, 4 do -- 4竖
+		createLine(layer, (i-1)*rectLen, 0, (i-1)*rectLen, display.height)
+	end
+	
+	for j = 1, 4 do -- 4横
+		createLine(layer, 0, (j-1)*rectLen, display.height, (j-1)*rectLen)
+	end
+
 	for i = 1, 4 do 
 		NumLabels[i] = {}
 		for j = 1, 4 do
-			createRect(layer, (i-1)*rectLen, (j-1)*rectLen, i*rectLen, j*rectLen)
 			local num = boarddata and boarddata[i][j] or 0
 			NumLabels[i][j] = createNum(layer, i, j, num)
 		end
@@ -155,6 +165,7 @@ end
 
 function MainScene:AfterOperate(num)
 	self:DrawBoard(layer)
+	self:RefreshScoreLayer()
 	-- 新出来的数字 延迟0.5s显示
 	scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.5) -- 定时器:只执行一次
 end
@@ -180,6 +191,93 @@ local function MergeArr(arr)
 	end	
 end
 
+
+local function encodedata(boarddata)
+	local arr = {}
+	for i = 1, 4 do 
+		for j = 1, 4 do 
+			table.insert(arr, boarddata[i][j])
+		end 
+	end 	
+	return table.concat(arr, ",")
+end 
+
+local function decodedata(str)
+	local boarddata = {}
+	local arr = utils.split(str, ",")
+	for i = 1, 4 do 
+		boarddata[i] = {}
+		for j = 1, 4 do 
+			table.insert(boarddata[i], tonumber(arr[(i-1)*4+j]))
+		end 
+	end 
+	return boarddata
+end 
+
+local function GetMaxScore(boardData)
+	boardData = boardData or BoardData
+	local maxScore = 0
+	for i = 1, 4 do 
+		for j = 1, 4 do 
+			if BoardData[i][j] > maxScore then 
+				maxScore = BoardData[i][j]
+			end 	
+		end 
+	end 
+	return maxScore
+end
+
+local function saveBoardData()
+	local curMaxScore = GetMaxScore(BoardData)
+	local str = encodedata(BoardData)
+	cc.UserDefault:getInstance():setStringForKey("boarddata", str); 
+	if curMaxScore > MaxScore then 
+		MaxScore = curMaxScore
+	end	
+	cc.UserDefault:getInstance():setStringForKey("maxscore", MaxScore);
+end
+
+local function loadBoardData()
+	local str = cc.UserDefault:getInstance():getStringForKey("boarddata");
+	local str2 = cc.UserDefault:getInstance():getStringForKey("maxscore");
+	if str2 and str2 ~= "" then 
+		MaxScore = tonumber(str2)
+	end 
+	
+	if str and str ~= "" then 
+		return decodedata(str)
+	else
+		return nil
+	end
+end
+
+local function GenMaxScoreStr(score)
+	return "历史最高分：" .. tostring(score)
+end 
+
+local function GenCurMaxScoreStr(score)
+    return "当前最高分：" .. tostring(score)
+end 
+
+function MainScene:RefreshScoreLayer()
+	local curMaxScore = GetMaxScore(BoardData)
+	if MaxScore < curMaxScore then 
+		MaxScore = curMaxScore
+	end	
+	MaxScoreLabel:setString(GenMaxScoreStr(MaxScore))
+	CurScoreLabel:setString(GenCurMaxScoreStr(curMaxScore))
+end
+
+local function InitScoreLayer()
+	MaxScoreLabel = cc.Label:createWithSystemFont(GenMaxScoreStr(MaxScore), "Arial", 35)
+	MaxScoreLabel:move((display.width - display.height)/2, display.height - rectLen) -- 此处是相对scoreLayer左下角的位置
+	MaxScoreLabel:addTo(scoreLayer) 	
+
+	CurScoreLabel = cc.Label:createWithSystemFont(GenCurMaxScoreStr(GetMaxScore(BoardData)), "Arial", 35)
+	CurScoreLabel:move((display.width - display.height)/2, display.height - 2*rectLen)
+	CurScoreLabel:addTo(scoreLayer)
+end
+
 function MainScene:InitBoard(boarddata)
 	local color = cc.c4b(255, 255, 0, 50)
     layer = cc.LayerColor:create(color)
@@ -191,10 +289,11 @@ function MainScene:InitBoard(boarddata)
     scoreLayer = cc.LayerColor:create(color1)
 	scoreLayer:setContentSize(cc.size(display.width - display.height, display.height))
 	scoreLayer:setPosition(cc.p(display.height, 0))
-	self:addChild(scoreLayer, 10)
-
+	self:addChild(scoreLayer)
+	
 	InitBoardData(boarddata)
 	InitNumLabels(boarddata)
+	InitScoreLayer()
 	if not boarddata then 
 		self:AfterOperate(2)
 	end
@@ -323,46 +422,6 @@ end
 function MainScene:onTouchCancelled(touch, event)
 end
 
-local function encodedata(boarddata)
-	local arr = {}
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			table.insert(arr, boarddata[i][j])
-		end 
-	end 	
-	return table.concat(arr, ",")
-end 
-
-local function decodedata(str)
-	local boarddata = {}
-	local arr = utils.split(str, ",")
-	for i = 1, 4 do 
-		boarddata[i] = {}
-		for j = 1, 4 do 
-			table.insert(boarddata[i], tonumber(arr[(i-1)*4+j]))
-		end 
-	end 
-	return boarddata
-end 
-
-local function saveBoardData()
-	local docpath = cc.FileUtils:getInstance():getWritablePath().."board.txt"
-	local f = assert(io.open(docpath, 'w'))
-	local str = encodedata(BoardData)
-	f:write(str)
-end
-
-local function loadBoardData()
-	local docpath = cc.FileUtils:getInstance():getWritablePath().."board.txt"
-	local isexit = cc.FileUtils:getInstance():isFileExist(docpath)
-	if isexit then
-		local str = cc.FileUtils:getInstance():getStringFromFile(docpath)
-		return decodedata(str)
-	else 
-		return nil 
-	end	
-end
-
 local function onRelease(keyCode, event)
 	if keyCode == cc.KeyCode.KEY_BACK then	
 		saveBoardData()
@@ -384,7 +443,7 @@ function MainScene:onCreate()
         :move(display.center)
         :addTo(self)
 	--]]
-	local olddata = loadBoardData()
+	local olddata, oldMaxScore = loadBoardData()
 	self:InitBoard(olddata)
 	local dispatcher = cc.Director:getInstance():getEventDispatcher()
 	-- 键盘事件
