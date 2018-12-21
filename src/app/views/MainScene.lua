@@ -10,28 +10,6 @@ local CurScoreLabel
 
 local rectLen = display.height/4
 
-function MainScene:onKeyPressed(keyCode, event)
-	if keyCode == cc.KeyCode.KEY_LEFT_ARROW then
-		self:OnLeft()
-		self:AfterOperate(1)
-	end	
-
-	if keyCode == cc.KeyCode.KEY_RIGHT_ARROW then
-		self:OnRight()
-		self:AfterOperate(1)
-	end
-
-	if keyCode == cc.KeyCode.KEY_UP_ARROW then
-		self:OnUp()
-		self:AfterOperate(1)
-	end	
-
-	if keyCode == cc.KeyCode.KEY_DOWN_ARROW then
-		self:OnDown()
-		self:AfterOperate(1)
-	end
-end
-
 local MaxScore = 0
 local BoardData = {} -- 面板数据
 local NumLabels = {} -- 数字组件
@@ -171,14 +149,16 @@ function MainScene:AfterOperate(num)
 end
 
 local function MergeArr(arr)
+	local canMerge = false 
 	if #arr <= 1 then 
-		return arr 
+		return arr, canMerge 
 	elseif #arr >= 2 then 	
 		local markIndex = 0
 		local tmpArr = {}
 		for i = 1, #arr do 
 			if i >= markIndex then
 				if arr[i] == arr[i+1] then 
+					canMerge = true
 					table.insert(tmpArr, arr[i] + arr[i+1])
 					markIndex = i+2
 				else
@@ -187,7 +167,7 @@ local function MergeArr(arr)
 				end
 			end
 		end
-		return tmpArr
+		return tmpArr, canMerge
 	end	
 end
 
@@ -295,17 +275,32 @@ function MainScene:InitBoard(boarddata)
 	InitNumLabels(boarddata)
 	InitScoreLayer()
 	if not boarddata then 
-		self:AfterOperate(2)
+		self:ResetBoard()
 	end
 end
 
+local function isSameArr(oldArr, newArr)
+	assert(#oldArr == #newArr)
+	local flag = true
+	for i = 1, #oldArr do 
+		if oldArr[i] ~= newArr[i] then 
+			flag = false 
+			break 
+		end 	
+	end
+	return flag
+end
+
 function MainScene:OnLeft()
+	local move = false
 	for i = 1, 4 do
+		local oldArr = {}
 		local arr = {}
 		for j = 1, 4 do
 			if BoardData[j][i] > 0 then
 				table.insert(arr, BoardData[j][i])
 			end	
+			table.insert(oldArr, BoardData[j][i])
 		end
 		arr = MergeArr(arr)
 		if #arr > 0 then 
@@ -317,16 +312,29 @@ function MainScene:OnLeft()
 				BoardData[k][i] = 0
 			end
 		end
+		
+		local newArr = {}
+		for j = 1, 4 do 
+			table.insert(newArr, BoardData[j][i])
+		end 
+		
+		if not isSameArr(oldArr, newArr) then 
+			move = true 
+		end	
 	end
+	return move
 end	
 
 function MainScene:OnRight()
+	local move = false
 	for i = 1, 4 do
+		local oldArr = {}
 		local arr = {}
 		for j = 4, 1, -1 do
 			if BoardData[j][i] > 0 then
 				table.insert(arr, BoardData[j][i])
 			end	
+			table.insert(oldArr, BoardData[j][i])
 		end
 		arr = MergeArr(arr)
 		if #arr > 0 then 
@@ -338,16 +346,29 @@ function MainScene:OnRight()
 				BoardData[k][i] = 0
 			end
 		end
+		
+		local newArr = {}
+		for j = 4, 1, -1 do 
+			table.insert(newArr, BoardData[j][i])
+		end 
+		
+		if not isSameArr(oldArr, newArr) then 
+			move = true 
+		end	
 	end
+	return move
 end
 
 function MainScene:OnUp()
+	local move = false
 	for i = 1, 4 do
+		local oldArr = {}
 		local arr = {}
 		for j = 4, 1, -1 do
 			if BoardData[i][j] > 0 then
 				table.insert(arr, BoardData[i][j])
 			end	
+			table.insert(oldArr, BoardData[i][j])
 		end
 		arr = MergeArr(arr)
 		if #arr > 0 then 
@@ -359,16 +380,29 @@ function MainScene:OnUp()
 				BoardData[i][k] = 0
 			end
 		end
+		
+		local newArr = {}
+		for j = 4, 1, -1 do 
+			table.insert(newArr, BoardData[i][j])
+		end 
+		
+		if not isSameArr(oldArr, newArr) then 
+			move = true 
+		end	
 	end
+	return move
 end	
 
 function MainScene:OnDown()
+	local move = false
 	for i = 1, 4 do
+		local oldArr = {}
 		local arr = {}
 		for j = 1, 4 do
 			if BoardData[i][j] > 0 then
 				table.insert(arr, BoardData[i][j])
 			end	
+			table.insert(oldArr, BoardData[i][j])
 		end
 		arr = MergeArr(arr)
 		if #arr > 0 then 
@@ -380,7 +414,17 @@ function MainScene:OnDown()
 				BoardData[i][k] = 0
 			end
 		end
+		
+		local newArr = {}
+		for j = 1, 4 do 
+			table.insert(newArr, BoardData[i][j])
+		end 
+		
+		if not isSameArr(oldArr, newArr) then 
+			move = true 
+		end	
 	end
+	return move
 end	
 
 local firstX = 0
@@ -404,25 +448,28 @@ function MainScene:onTouchEnded(touch, event)
 	local endY = firstY - endPoint.y
 
 	-- 看是横向移动大还是纵向滑动大
+	local flag = false -- 滑动后发现有合并的 则新增数字
 	if math.abs(endX) > math.abs(endY) then 
 		if math.abs(endX) > 5 then -- 滑动太少不算
 			if endX > 0 then 
-				self:OnLeft()
+				 flag = self:OnLeft()
 			else 
-				self:OnRight()
+				flag = self:OnRight()
 			end
-			self:AfterOperate(1)
 		end		
 	else 
 		if math.abs(endY) > 5 then -- 滑动太少不算
 			if endY > 0 then 
-				self:OnDown()
+				flag = self:OnDown()
 			else 
-				self:OnUp()
+				flag = self:OnUp()
 			end	
-			self:AfterOperate(1)
 		end	
 	end
+	
+	if flag then 
+		self:AfterOperate(1)
+	end	
 end 
 
 function MainScene:onTouchCancelled(touch, event)
@@ -434,11 +481,10 @@ local function onRelease(keyCode, event)
 		cc.Director:getInstance():endToLua()
 	elseif keyCode == cc.KeyCode.KEY_HOME then
 		saveBoardData()
-		--cc.Director:getInstance():endToLua()
 	elseif keyCode == cc.KeyCode.KEY_Q then
 		saveBoardData()
 		cc.Director:getInstance():endToLua()
-	end	
+	end
 end
 
 function MainScene:onCreate()
@@ -449,12 +495,14 @@ function MainScene:onCreate()
         :move(display.center)
         :addTo(self)
 	--]]
+	
 	local olddata, oldMaxScore = loadBoardData()
 	self:InitBoard(olddata)
+	
 	local dispatcher = cc.Director:getInstance():getEventDispatcher()
+
 	-- 键盘事件
 	local listener = cc.EventListenerKeyboard:create()
-	listener:registerScriptHandler(function(keyCode, event) self:onKeyPressed(keyCode, event) end, cc.Handler.EVENT_KEYBOARD_PRESSED)
 	listener:registerScriptHandler(onRelease, cc.Handler.EVENT_KEYBOARD_RELEASED) -- 响应安卓返回键
 	dispatcher:addEventListenerWithSceneGraphPriority(listener, self)
 		
