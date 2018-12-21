@@ -403,20 +403,26 @@ function MainScene:onTouchEnded(touch, event)
 	local endX = firstX - endPoint.x
 	local endY = firstY - endPoint.y
 
-	if math.abs(endX) > math.abs(endY) then -- 看是横向移动大还是纵向移动大
-		if endX > 0 then 
-			self:OnLeft()
-		else 
-			self:OnRight()
-		end	
+	-- 看是横向移动大还是纵向滑动大
+	if math.abs(endX) > math.abs(endY) then 
+		if math.abs(endX) > 5 then -- 滑动太少不算
+			if endX > 0 then 
+				self:OnLeft()
+			else 
+				self:OnRight()
+			end
+			self:AfterOperate(1)
+		end		
 	else 
-		if endY > 0 then 
-			self:OnDown()
-		else 
-			self:OnUp()
+		if math.abs(endY) > 5 then -- 滑动太少不算
+			if endY > 0 then 
+				self:OnDown()
+			else 
+				self:OnUp()
+			end	
+			self:AfterOperate(1)
 		end	
 	end
-	self:AfterOperate(1)
 end 
 
 function MainScene:onTouchCancelled(touch, event)
