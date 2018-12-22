@@ -125,7 +125,7 @@ end
 
 function MainScene:ResetBoard()
 	InitBoardData()
-	self:AfterOperate(2)
+	self:AfterOperate(2, true)
 end
 
 function MainScene:AddNum(num)
@@ -251,11 +251,11 @@ end
 
 local function InitScoreLayer()
 	MaxScoreLabel = cc.Label:createWithSystemFont(GenMaxScoreStr(MaxScore), "Arial", 35)
-	MaxScoreLabel:move((display.width - display.height)/2, display.height - rectLen) -- 此处是相对scoreLayer左下角的位置
+	MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen) -- 此处是相对scoreLayer左下角的位置
 	MaxScoreLabel:addTo(scoreLayer) 	
 
 	CurScoreLabel = cc.Label:createWithSystemFont(GenCurMaxScoreStr(GetMaxScore(BoardData)), "Arial", 35)
-	CurScoreLabel:move((display.width - display.height)/2, display.height - 2*rectLen)
+	CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
 	CurScoreLabel:addTo(scoreLayer)
 end
 
@@ -491,6 +491,16 @@ function MainScene:onCreate()
     welcomeSprite:move(display.center)
     welcomeSprite:addTo(self, 100)
 	scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
+	
+	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
+	resetBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			print("touch button....")
+			self:ResetBoard()
+		end
+    end)
+	resetBtn:setPosition(display.width - 80, display.height - 80)
+	resetBtn:addTo(self)
 	
 	local olddata, oldMaxScore = loadBoardData()
 	self:InitBoard(olddata)
