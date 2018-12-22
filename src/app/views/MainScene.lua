@@ -35,7 +35,7 @@ end
 
 local function createLine(layer, x1, y1, x2, y2)	
 	local draw = cc.DrawNode:create()
-	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 5, cc.c4f(1,1,0,1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
+	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 4, cc.c4f(1,1,0,1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
 	layer:addChild(draw)
 end
 
@@ -488,13 +488,10 @@ local function onRelease(keyCode, event)
 end
 
 function MainScene:onCreate()
-	-- todo: 增加logo界面 间隔1s消失掉
-    --add background image
-	--[[
-    display.newSprite("HelloWorld.png")
-        :move(display.center)
-        :addTo(self)
-	--]]
+	local welcomeSprite = display.newSprite("welcome.jpg")
+    welcomeSprite:move(display.center)
+    welcomeSprite:addTo(self, 100)
+	scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
 	
 	local olddata, oldMaxScore = loadBoardData()
 	self:InitBoard(olddata)
