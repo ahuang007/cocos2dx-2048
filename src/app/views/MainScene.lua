@@ -129,23 +129,24 @@ function MainScene:ResetBoard()
 end
 
 function MainScene:AddNum(num)
-	if not isBoardEnd() then 
-		if GetNumCount() < 16 then 
-			GenNewNum(num)
-			self:DrawBoard(layer)
-		end	
-	else
-		-- todo: 重置确认弹框
-		print("2048 game is over, Do you want to reset ? ")	
-		self:ResetBoard()
+	if GetNumCount() < 16 then 
+		GenNewNum(num)
+		self:DrawBoard(layer)
 	end
 end
 
-function MainScene:AfterOperate(num)
-	self:DrawBoard(layer)
-	self:RefreshScoreLayer()
-	-- 新出来的数字 延迟0.5s显示
-	scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.5) -- 定时器:只执行一次
+function MainScene:AfterOperate(num, move)
+	if move then 
+		self:DrawBoard(layer)
+		self:RefreshScoreLayer()
+		-- 新出来的数字 延迟0.5s显示
+		scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.5) -- 定时器:只执行一次
+	else 
+		if isBoardEnd() then -- todo: 重置确认弹框
+			print("2048 game is over, Do you want to reset ? ")	
+			self:ResetBoard()
+		end
+	end
 end
 
 local function MergeArr(arr)
@@ -467,9 +468,7 @@ function MainScene:onTouchEnded(touch, event)
 		end	
 	end
 	
-	if flag then 
-		self:AfterOperate(1)
-	end	
+	self:AfterOperate(1, flag)
 end 
 
 function MainScene:onTouchCancelled(touch, event)
