@@ -3,11 +3,13 @@ local MainScene = class("MainScene", cc.load("mvc").ViewBase)
 local utils = require "utils"
 local scheduler = require ("scheduler") -- 定时器
 local json -- todo cjson库
-local layer 
-local scoreLayer
+local Board = require "Board"
+
+local BoardLayer 
+local ScoreLayer
 local MaxScoreLabel
 local CurScoreLabel
-local overLabel
+local OverLabel
 
 local rectLen = display.height/4
 
@@ -28,72 +30,47 @@ local Num2Color = {
 }
 
 local MaxScore = 0
-local BoardData = {} -- 面板数据
 local NumLabels = {} -- 数字组件
 
-local function createNum(layer, idx, idy, num)
+local function createNum(idx, idy)
 	local cx = (idx-1)*rectLen +rectLen/2 
 	local cy = (idy-1)*rectLen +rectLen/2 
-	local numstr = num ~= 0 and tostring(num) or "" 
-	local label = cc.Label:createWithSystemFont(numstr, "Arial", 40)
+	local label = cc.Label:createWithSystemFont("", "Arial", 40)
 	label:move(cx, cy)
-	label:addTo(layer) 	
+	label:addTo(BoardLayer) 	
 	return label
 end
 
-local function InitBoardData(boarddata)
-	for i = 1, 4 do 
-		BoardData[i] = {}
-		for j = 1, 4 do
-			BoardData[i][j] = boarddata and boarddata[i][j] or 0
-		end
-	end
-end
-
-local function createLine(layer, x1, y1, x2, y2)	
+local function createLine(x1, y1, x2, y2)	
 	local draw = cc.DrawNode:create()
 	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 4, cc.c4f(1,1,0,1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
-	layer:addChild(draw)
+	BoardLayer:addChild(draw)
 end
 
 
-local function InitNumLabels(boarddata)
+local function InitNumLabels()
 	for i = 1, 5 do -- 5竖
-		createLine(layer, (i-1)*rectLen, 0, (i-1)*rectLen, display.height)
+		createLine((i-1)*rectLen, 0, (i-1)*rectLen, display.height)
 	end
 	
 	for j = 1, 5 do -- 5横
-		createLine(layer, 0, (j-1)*rectLen, display.height, (j-1)*rectLen)
+		createLine(0, (j-1)*rectLen, display.height, (j-1)*rectLen)
 	end
 
 	for i = 1, 4 do 
 		NumLabels[i] = {}
 		for j = 1, 4 do
-			local num = 0 --boarddata and boarddata[i][j] or 0
-			NumLabels[i][j] = createNum(layer, i, j, 0)
+			NumLabels[i][j] = createNum(i, j)
 		end
 	end
 end	
 
-local function GenNewNum(num)
-	local emptypos = {}
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			if BoardData[i][j] == 0 then 
-				table.insert(emptypos, {i, j})
-			end 	
-		end	
-	end
-	local newArr = utils.get_random_sublist(emptypos, num)
-	for _, v in ipairs(newArr) do 
-		BoardData[v[1]][v[2]] =  2 -- todo: 当最大数增大 这个值会变化
-	end
-end 
 
-function MainScene:DrawBoard(layer)
+function MainScene:DrawBoard()
+	local boarddata = Board.GetBoardData()
 	for i = 1, 4 do 
 		for j = 1, 4 do 
-			local num = BoardData[i][j]
+			local num = boarddata[i][j]
 			local numLabel = NumLabels[i][j]
 			if num > 0 then 
 				local rgbArr
@@ -111,140 +88,46 @@ function MainScene:DrawBoard(layer)
 	end	
 end
 
-local function GetNumCount()
-	local count = 0
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			if BoardData[i][j] > 0 then 
-				count = count + 1
-			end 	
-		end 
-	end
-	return count
-end	
-
-local function isBoardEnd()
-	if GetNumCount() < 16 then 
-		return false 
-	end	
-
-	local canMerge = false
-	for i = 1, 4 do 
-		for j = 1, 3 do 
-			if BoardData[i][j] == BoardData[i][j+1] then 
-				canMerge = true
-				break
-			end	
-		end 
-	end 	 
-
-	for i = 1, 4 do 
-		for j = 1, 3 do 
-			if BoardData[j][i] == BoardData[j+1][i] then 
-				canMerge = true
-				break
-			end	
-		end 
-	end 
-
-	return (not canMerge)
-end	
-
 function MainScene:ResetBoard()
-	if overLabel then 
-		overLabel:removeFromParent()
-	end 	
-	InitBoardData()
+	if OverLabel then 
+		OverLabel:setString("")
+	end	
+	Board.InitBoardData()
 	self:AfterOperate(2, true)
 end
 
 function MainScene:AddNum(num)
-	if GetNumCount() < 16 then 
-		GenNewNum(num)
-		self:DrawBoard(layer)
+	if Board.GetNumCount() < 16 then 
+		Board.GenNewNum(num)
+		self:DrawBoard()
 	end
 end
 
 function MainScene:AfterOperate(num, move)
 	if move then 
-		self:DrawBoard(layer)
+		self:DrawBoard()
 		self:RefreshScoreLayer()
 		-- 新出来的数字 延迟0.5s显示
 		scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.5) -- 定时器:只执行一次
 	else 
-		if isBoardEnd() then -- todo: 重置确认弹框
+		if Board.isBoardEnd() then -- todo: 重置确认弹框
 			print("2048 game is over, Do you want to reset ? ")	
-			
-			local overLabel = cc.Label:createWithSystemFont("GAME OVER", "Arial", 60)
-			overLabel:move(display.height/2, display.height/2)
-			local color = cc.c4b(0, 0, 0, 100)
-			overLabel:setColor(color)
-			overLabel:addTo(layer)			
-			--self:ResetBoard()
+			if not OverLabel then 
+				OverLabel = cc.Label:createWithSystemFont("GAME OVER", "Arial", 60)
+				OverLabel:move(display.height/2, display.height/2)
+				local color = cc.c4b(0, 0, 0, 100)
+				OverLabel:setColor(color)
+				OverLabel:addTo(BoardLayer)			
+			else
+				OverLabel:setString("GAME OVER")
+			end
 		end
 	end
 end
 
-local function MergeArr(arr)
-	local canMerge = false 
-	if #arr <= 1 then 
-		return arr, canMerge 
-	elseif #arr >= 2 then 	
-		local markIndex = 0
-		local tmpArr = {}
-		for i = 1, #arr do 
-			if i >= markIndex then
-				if arr[i] == arr[i+1] then 
-					canMerge = true
-					table.insert(tmpArr, arr[i] + arr[i+1])
-					markIndex = i+2
-				else
-					table.insert(tmpArr, arr[i]) 
-					markIndex = i+1
-				end
-			end
-		end
-		return tmpArr, canMerge
-	end	
-end
-
-
-local function encodedata(boarddata)
-	local arr = {}
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			table.insert(arr, boarddata[i][j])
-		end 
-	end 	
-	return table.concat(arr, ",")
-end 
-
-local function decodedata(str)
-	local boarddata = {}
-	local arr = utils.split(str, ",")
-	for i = 1, 4 do 
-		boarddata[i] = {}
-		for j = 1, 4 do 
-			table.insert(boarddata[i], tonumber(arr[(i-1)*4+j]))
-		end 
-	end 
-	return boarddata
-end 
-
-local function GetMaxScore(boardData)
-	boardData = boardData or BoardData
-	local maxScore = 0
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			maxScore = maxScore + BoardData[i][j]
-		end 
-	end 
-	return maxScore
-end
-
 local function saveBoardData()
-	local curMaxScore = GetMaxScore(BoardData)
-	local str = encodedata(BoardData)
+	local curMaxScore = Board.GetMaxScore()
+	local str = Board.encodedata()
 	cc.UserDefault:getInstance():setStringForKey("boarddata", str); 
 	if curMaxScore > MaxScore then 
 		MaxScore = curMaxScore
@@ -252,7 +135,7 @@ local function saveBoardData()
 	cc.UserDefault:getInstance():setStringForKey("maxscore", MaxScore);
 end
 
-local function loadBoardData()
+local function LoadUserData()
 	local str = cc.UserDefault:getInstance():getStringForKey("boarddata");
 	local str2 = cc.UserDefault:getInstance():getStringForKey("maxscore");
 	if str2 and str2 ~= "" then 
@@ -260,14 +143,15 @@ local function loadBoardData()
 	end 
 	
 	if str and str ~= "" then 
-		return decodedata(str)
+		local boarddata = Board.decodedata(str)
+		 Board.SetBoardData(boarddata)
 	else
-		return nil
+		Board.SetBoardData(nil)
 	end
 end
 
 function MainScene:RefreshScoreLayer()
-	local curMaxScore = GetMaxScore(BoardData)
+	local curMaxScore = Board.GetMaxScore()
 	if MaxScore < curMaxScore then 
 		MaxScore = curMaxScore
 	end	
@@ -278,190 +162,41 @@ end
 local function InitScoreLayer()
 	local MaxStaticLayer = cc.Label:createWithSystemFont("历史纪录", "Arial", 35)
 	MaxStaticLayer:move((display.width - display.height)/2, display.height - 1*rectLen) -- 此处是相对scoreLayer左下角的位置
-	MaxStaticLayer:addTo(scoreLayer) 	
+	MaxStaticLayer:addTo(ScoreLayer) 	
 	
 	MaxScoreLabel = cc.Label:createWithSystemFont(tostring(MaxScore), "Arial", 35)
 	MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen) 
-	MaxScoreLabel:addTo(scoreLayer) 	
+	MaxScoreLabel:addTo(ScoreLayer) 	
 	
 	local CurStaticLayer = cc.Label:createWithSystemFont("当前分数", "Arial", 35)
 	CurStaticLayer:move((display.width - display.height)/2, display.height - 2*rectLen) -- 此处是相对scoreLayer左下角的位置
-	CurStaticLayer:addTo(scoreLayer) 	
+	CurStaticLayer:addTo(ScoreLayer) 	
 
-	CurScoreLabel = cc.Label:createWithSystemFont(tostring(GetMaxScore(BoardData)), "Arial", 35)
+	CurScoreLabel = cc.Label:createWithSystemFont(tostring(Board.GetMaxScore()), "Arial", 35)
 	CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
-	CurScoreLabel:addTo(scoreLayer)
+	CurScoreLabel:addTo(ScoreLayer)
 end
 
-function MainScene:InitBoard(boarddata)
+function MainScene:InitBoard()
 	local color = cc.c4b(255, 255, 0, 50)
-    layer = cc.LayerColor:create(color)
-	layer:setContentSize(cc.size(display.height, display.height))
-	layer:setPosition(cc.p(0, 0))
-	self:addChild(layer, 1)
+    BoardLayer = cc.LayerColor:create(color)
+	BoardLayer:setContentSize(cc.size(display.height, display.height))
+	BoardLayer:setPosition(cc.p(0, 0))
+	self:addChild(BoardLayer, 1)
 	
 	local color1 = cc.c4b(255, 255, 0, 100)
-    scoreLayer = cc.LayerColor:create(color1)
-	scoreLayer:setContentSize(cc.size(display.width - display.height, display.height))
-	scoreLayer:setPosition(cc.p(display.height, 0))
-	self:addChild(scoreLayer)
-	
-	InitBoardData(boarddata)
-	InitNumLabels(boarddata)
-	self:DrawBoard(layer)
-	InitScoreLayer()
-	if not boarddata then 
+    ScoreLayer = cc.LayerColor:create(color1)
+	ScoreLayer:setContentSize(cc.size(display.width - display.height, display.height))
+	ScoreLayer:setPosition(cc.p(display.height, 0))
+	self:addChild(ScoreLayer)
+
+	InitNumLabels()
+	InitScoreLayer()	
+	self:DrawBoard()
+	if not Board.GetBoardData() then 
 		self:ResetBoard()
 	end
 end
-
-local function isSameArr(oldArr, newArr)
-	assert(#oldArr == #newArr)
-	local flag = true
-	for i = 1, #oldArr do 
-		if oldArr[i] ~= newArr[i] then 
-			flag = false 
-			break 
-		end 	
-	end
-	return flag
-end
-
-function MainScene:OnLeft()
-	local move = false
-	for i = 1, 4 do
-		local oldArr = {}
-		local arr = {}
-		for j = 1, 4 do
-			if BoardData[j][i] > 0 then
-				table.insert(arr, BoardData[j][i])
-			end	
-			table.insert(oldArr, BoardData[j][i])
-		end
-		arr = MergeArr(arr)
-		if #arr > 0 then 
-			for k = 1, #arr do 
-				BoardData[k][i] = arr[k]
-			end
-
-			for k = #arr+1, 4 do 
-				BoardData[k][i] = 0
-			end
-		end
-		
-		local newArr = {}
-		for j = 1, 4 do 
-			table.insert(newArr, BoardData[j][i])
-		end 
-		
-		if not isSameArr(oldArr, newArr) then 
-			move = true 
-		end	
-	end
-	return move
-end	
-
-function MainScene:OnRight()
-	local move = false
-	for i = 1, 4 do
-		local oldArr = {}
-		local arr = {}
-		for j = 4, 1, -1 do
-			if BoardData[j][i] > 0 then
-				table.insert(arr, BoardData[j][i])
-			end	
-			table.insert(oldArr, BoardData[j][i])
-		end
-		arr = MergeArr(arr)
-		if #arr > 0 then 
-			for k = 4, 4-#arr+1, -1 do 
-				BoardData[k][i] = arr[4-k+1]
-			end
-
-			for k = 4-#arr, 1, -1 do 
-				BoardData[k][i] = 0
-			end
-		end
-		
-		local newArr = {}
-		for j = 4, 1, -1 do 
-			table.insert(newArr, BoardData[j][i])
-		end 
-		
-		if not isSameArr(oldArr, newArr) then 
-			move = true 
-		end	
-	end
-	return move
-end
-
-function MainScene:OnUp()
-	local move = false
-	for i = 1, 4 do
-		local oldArr = {}
-		local arr = {}
-		for j = 4, 1, -1 do
-			if BoardData[i][j] > 0 then
-				table.insert(arr, BoardData[i][j])
-			end	
-			table.insert(oldArr, BoardData[i][j])
-		end
-		arr = MergeArr(arr)
-		if #arr > 0 then 
-			for k = 4, 4-#arr+1, -1 do 
-				BoardData[i][k] = arr[4-k+1]
-			end
-
-			for k = 4-#arr, 1, -1 do 
-				BoardData[i][k] = 0
-			end
-		end
-		
-		local newArr = {}
-		for j = 4, 1, -1 do 
-			table.insert(newArr, BoardData[i][j])
-		end 
-		
-		if not isSameArr(oldArr, newArr) then 
-			move = true 
-		end	
-	end
-	return move
-end	
-
-function MainScene:OnDown()
-	local move = false
-	for i = 1, 4 do
-		local oldArr = {}
-		local arr = {}
-		for j = 1, 4 do
-			if BoardData[i][j] > 0 then
-				table.insert(arr, BoardData[i][j])
-			end	
-			table.insert(oldArr, BoardData[i][j])
-		end
-		arr = MergeArr(arr)
-		if #arr > 0 then 
-			for k = 1, #arr do 
-				BoardData[i][k] = arr[k]
-			end
-
-			for k = #arr+1, 4 do 
-				BoardData[i][k] = 0
-			end
-		end
-		
-		local newArr = {}
-		for j = 1, 4 do 
-			table.insert(newArr, BoardData[i][j])
-		end 
-		
-		if not isSameArr(oldArr, newArr) then 
-			move = true 
-		end	
-	end
-	return move
-end	
 
 local firstX = 0
 local firstY = 0
@@ -488,17 +223,17 @@ function MainScene:onTouchEnded(touch, event)
 	if math.abs(endX) > math.abs(endY) then 
 		if math.abs(endX) > 5 then -- 滑动太少不算
 			if endX > 0 then 
-				 flag = self:OnLeft()
+				 flag = Board.OnLeft()
 			else 
-				flag = self:OnRight()
+				flag = Board.OnRight()
 			end
 		end		
 	else 
 		if math.abs(endY) > 5 then -- 滑动太少不算
 			if endY > 0 then 
-				flag = self:OnDown()
+				flag = Board.OnDown()
 			else 
-				flag = self:OnUp()
+				flag = Board.OnUp()
 			end	
 		end	
 	end
@@ -530,15 +265,15 @@ function MainScene:onCreate()
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
-			print("touch button....")
+			print("touch reset button....")
 			self:ResetBoard()
 		end
     end)
 	resetBtn:setPosition(display.width - 80, display.height - 80)
 	resetBtn:addTo(self)
 	
-	local olddata, oldMaxScore = loadBoardData()
-	self:InitBoard(olddata)
+	LoadUserData()
+	self:InitBoard()
 	
 	local dispatcher = cc.Director:getInstance():getEventDispatcher()
 
