@@ -7,8 +7,25 @@ local layer
 local scoreLayer
 local MaxScoreLabel
 local CurScoreLabel
+local overLabel
 
 local rectLen = display.height/4
+
+-- 数字颜色
+local Num2Color = {
+	[2] 	= {238, 228, 218},
+	[4] 	= {236, 224, 200},
+	[8] 	= {242, 177, 121},
+	[16] 	= {245, 149, 99},
+	[32] 	= {247, 123, 97},
+	[64] 	= {246, 93,	 59},
+	[128] 	= {239, 206, 113},
+	[256] 	= {237, 205, 96}, 
+	[512] 	= {236, 200, 80}, 
+	[1024] 	= {237, 197, 63},
+	[2048] 	= {238, 194, 46},
+	[4096] 	= {0,   0,   0},
+}
 
 local MaxScore = 0
 local BoardData = {} -- 面板数据
@@ -41,19 +58,19 @@ end
 
 
 local function InitNumLabels(boarddata)
-	for i = 1, 4 do -- 4竖
+	for i = 1, 5 do -- 5竖
 		createLine(layer, (i-1)*rectLen, 0, (i-1)*rectLen, display.height)
 	end
 	
-	for j = 1, 4 do -- 4横
+	for j = 1, 5 do -- 5横
 		createLine(layer, 0, (j-1)*rectLen, display.height, (j-1)*rectLen)
 	end
 
 	for i = 1, 4 do 
 		NumLabels[i] = {}
 		for j = 1, 4 do
-			local num = boarddata and boarddata[i][j] or 0
-			NumLabels[i][j] = createNum(layer, i, j, num)
+			local num = 0 --boarddata and boarddata[i][j] or 0
+			NumLabels[i][j] = createNum(layer, i, j, 0)
 		end
 	end
 end	
@@ -77,12 +94,22 @@ function MainScene:DrawBoard(layer)
 	for i = 1, 4 do 
 		for j = 1, 4 do 
 			local num = BoardData[i][j]
-			local label = NumLabels[i][j]
-			local str = num > 0 and tostring(num) or ""
-			label:setString(str)
-		end 
-	end 		
-end	
+			local numLabel = NumLabels[i][j]
+			if num > 0 then 
+				local rgbArr
+				if num >= 4096 then 
+					rgbArr = Num2Color[4096]
+				else 
+					rgbArr = Num2Color[num]
+				end
+				numLabel:setColor(cc.c4b(rgbArr[1], rgbArr[2], rgbArr[3], 100))
+				numLabel:setString(tonumber(num))
+			else 
+				numLabel:setString("")
+			end
+		end
+	end	
+end
 
 local function GetNumCount()
 	local count = 0
@@ -124,6 +151,9 @@ local function isBoardEnd()
 end	
 
 function MainScene:ResetBoard()
+	if overLabel then 
+		overLabel:removeFromParent()
+	end 	
 	InitBoardData()
 	self:AfterOperate(2, true)
 end
@@ -144,7 +174,13 @@ function MainScene:AfterOperate(num, move)
 	else 
 		if isBoardEnd() then -- todo: 重置确认弹框
 			print("2048 game is over, Do you want to reset ? ")	
-			self:ResetBoard()
+			
+			local overLabel = cc.Label:createWithSystemFont("GAME OVER", "Arial", 60)
+			overLabel:move(display.height/2, display.height/2)
+			local color = cc.c4b(0, 0, 0, 100)
+			overLabel:setColor(color)
+			overLabel:addTo(layer)			
+			--self:ResetBoard()
 		end
 	end
 end
@@ -200,9 +236,7 @@ local function GetMaxScore(boardData)
 	local maxScore = 0
 	for i = 1, 4 do 
 		for j = 1, 4 do 
-			if BoardData[i][j] > maxScore then 
-				maxScore = BoardData[i][j]
-			end 	
+			maxScore = maxScore + BoardData[i][j]
 		end 
 	end 
 	return maxScore
@@ -232,29 +266,29 @@ local function loadBoardData()
 	end
 end
 
-local function GenMaxScoreStr(score)
-	return "历史最高分：" .. tostring(score)
-end 
-
-local function GenCurMaxScoreStr(score)
-    return "当前最高分：" .. tostring(score)
-end 
-
 function MainScene:RefreshScoreLayer()
 	local curMaxScore = GetMaxScore(BoardData)
 	if MaxScore < curMaxScore then 
 		MaxScore = curMaxScore
 	end	
-	MaxScoreLabel:setString(GenMaxScoreStr(MaxScore))
-	CurScoreLabel:setString(GenCurMaxScoreStr(curMaxScore))
+	MaxScoreLabel:setString(tostring(MaxScore))
+	CurScoreLabel:setString(tostring(curMaxScore))
 end
 
 local function InitScoreLayer()
-	MaxScoreLabel = cc.Label:createWithSystemFont(GenMaxScoreStr(MaxScore), "Arial", 35)
-	MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen) -- 此处是相对scoreLayer左下角的位置
+	local MaxStaticLayer = cc.Label:createWithSystemFont("历史纪录", "Arial", 35)
+	MaxStaticLayer:move((display.width - display.height)/2, display.height - 1*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MaxStaticLayer:addTo(scoreLayer) 	
+	
+	MaxScoreLabel = cc.Label:createWithSystemFont(tostring(MaxScore), "Arial", 35)
+	MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen) 
 	MaxScoreLabel:addTo(scoreLayer) 	
+	
+	local CurStaticLayer = cc.Label:createWithSystemFont("当前分数", "Arial", 35)
+	CurStaticLayer:move((display.width - display.height)/2, display.height - 2*rectLen) -- 此处是相对scoreLayer左下角的位置
+	CurStaticLayer:addTo(scoreLayer) 	
 
-	CurScoreLabel = cc.Label:createWithSystemFont(GenCurMaxScoreStr(GetMaxScore(BoardData)), "Arial", 35)
+	CurScoreLabel = cc.Label:createWithSystemFont(tostring(GetMaxScore(BoardData)), "Arial", 35)
 	CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
 	CurScoreLabel:addTo(scoreLayer)
 end
@@ -264,7 +298,7 @@ function MainScene:InitBoard(boarddata)
     layer = cc.LayerColor:create(color)
 	layer:setContentSize(cc.size(display.height, display.height))
 	layer:setPosition(cc.p(0, 0))
-	self:addChild(layer)
+	self:addChild(layer, 1)
 	
 	local color1 = cc.c4b(255, 255, 0, 100)
     scoreLayer = cc.LayerColor:create(color1)
@@ -274,6 +308,7 @@ function MainScene:InitBoard(boarddata)
 	
 	InitBoardData(boarddata)
 	InitNumLabels(boarddata)
+	self:DrawBoard(layer)
 	InitScoreLayer()
 	if not boarddata then 
 		self:ResetBoard()
