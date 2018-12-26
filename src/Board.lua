@@ -50,7 +50,7 @@ function Board.decodedata(str)
 	return boarddata
 end 
 
-function Board.GetMaxScore(boardData)
+function Board.GetTotalScore(boardData)
 	boardData = boardData or BoardData
 	local maxScore = 0
 	for i = 1, 4 do 

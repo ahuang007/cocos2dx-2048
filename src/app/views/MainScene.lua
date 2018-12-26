@@ -2,7 +2,7 @@
 local MainScene = class("MainScene", cc.load("mvc").ViewBase)
 local utils = require "utils"
 local scheduler = require ("scheduler") -- 定时器
-local json -- todo cjson库
+local json = require "json"
 local Board = require "Board"
 
 local BoardLayer 
@@ -10,6 +10,12 @@ local ScoreLayer
 local MaxScoreLabel
 local CurScoreLabel
 local OverLabel
+
+local rankFlag = false
+local rankLayer
+local ranklist = {}
+local myrank = 0
+local MyRankLabel
 
 local rectLen = display.height/4
 
@@ -103,6 +109,75 @@ function MainScene:AddNum(num)
 	end
 end
 
+-- todo: 增加配置文件
+local serverIp = '47.106.34.35' -- 排行榜服务器
+local port = 7100
+
+-- todo: 新增玩家数据文件 step1：客户端随机生成并保存到文件 step2:增加登录服
+local userdata = { 
+	uid = 99944,
+	name = "ahuang007",
+	headIcon = "",
+}
+
+local function GetRankList()
+	local xhr = cc.XMLHttpRequest:new()	--http请求
+	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
+	local url = string.format('http://%s:%d/GetRankList?appid=1&data={"uid":%d,"startindex":%d,"endindex":%d}', 
+	serverIp, port, userdata.uid, 1, 10)
+	print("url ----------- ", url)
+	xhr:open("GET", url)
+	local function onResponse()
+		local str = xhr.response	--获得返回数据
+		print("GetRankList resp", str)
+		local data = json.decode(str)
+		if data.status == 0 then 
+			ranklist = data.lists
+			for i, v in ipairs(ranklist) do 
+				print("ranlist ", v.uid, v.rank, v.name, v.score)
+				if v.uid == userdata.uid then 
+					myrank = v.rank
+					local str = "我的排名：" .. (myrank == 0 and "未上榜" or tostring(myrank))
+					MyRankLabel:setString(str)
+				end
+			end
+		end 
+	end
+	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
+	xhr:send()	--发送 
+end 
+
+local function CommitData2Server(score)
+	local xhr = cc.XMLHttpRequest:new()	--http请求
+	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
+	local url = string.format('http://%s:%d/CommitData?appid=1&data={"uid":%d,"name":"%s","headIcon":"%s","score":%d}', 
+	serverIp, port, userdata.uid, userdata.name, userdata.headIcon, score)
+	print("url ----------- ", url)
+	xhr:open("GET", url)
+	local function onResponse()
+		local str = xhr.response	--获得返回数据
+		print("CommitData2Server resp", str)
+		local data = json.decode(str)
+		if data.status == 0 then 
+			print("commitdata ok!", score)
+			GetRankList()
+		end 
+	end
+	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
+	xhr:send()	--发送
+end 
+
+local function saveBoardData()
+	local curMaxScore = Board.GetTotalScore()
+	local str = Board.encodedata()
+	cc.UserDefault:getInstance():setStringForKey("boarddata", str); 
+	if curMaxScore > MaxScore then 
+		MaxScore = curMaxScore
+		CommitData2Server(MaxScore)
+	end	
+	cc.UserDefault:getInstance():setStringForKey("maxscore", MaxScore);
+end
+
 function MainScene:AfterOperate(num, move)
 	if move then 
 		self:DrawBoard()
@@ -121,18 +196,15 @@ function MainScene:AfterOperate(num, move)
 			else
 				OverLabel:setString("GAME OVER")
 			end
+			
+			local curScore = Board.GetTotalScore()
+			if curScore >= MaxScore then 
+				MaxScore = curScore
+				saveBoardData()
+				CommitData2Server(MaxScore)
+			end
 		end
 	end
-end
-
-local function saveBoardData()
-	local curMaxScore = Board.GetMaxScore()
-	local str = Board.encodedata()
-	cc.UserDefault:getInstance():setStringForKey("boarddata", str); 
-	if curMaxScore > MaxScore then 
-		MaxScore = curMaxScore
-	end	
-	cc.UserDefault:getInstance():setStringForKey("maxscore", MaxScore);
 end
 
 local function LoadUserData()
@@ -151,7 +223,7 @@ local function LoadUserData()
 end
 
 function MainScene:RefreshScoreLayer()
-	local curMaxScore = Board.GetMaxScore()
+	local curMaxScore = Board.GetTotalScore()
 	if MaxScore < curMaxScore then 
 		MaxScore = curMaxScore
 	end	
@@ -160,19 +232,19 @@ function MainScene:RefreshScoreLayer()
 end
 
 local function InitScoreLayer()
-	local MaxStaticLayer = cc.Label:createWithSystemFont("历史纪录", "Arial", 35)
-	MaxStaticLayer:move((display.width - display.height)/2, display.height - 1*rectLen) -- 此处是相对scoreLayer左下角的位置
-	MaxStaticLayer:addTo(ScoreLayer) 	
+	local MaxStaticLabel = cc.Label:createWithSystemFont("历史纪录", "Arial", 35)
+	MaxStaticLabel:move((display.width - display.height)/2, display.height - 1*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MaxStaticLabel:addTo(ScoreLayer) 	
 	
 	MaxScoreLabel = cc.Label:createWithSystemFont(tostring(MaxScore), "Arial", 35)
 	MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen) 
 	MaxScoreLabel:addTo(ScoreLayer) 	
 	
-	local CurStaticLayer = cc.Label:createWithSystemFont("当前分数", "Arial", 35)
-	CurStaticLayer:move((display.width - display.height)/2, display.height - 2*rectLen) -- 此处是相对scoreLayer左下角的位置
-	CurStaticLayer:addTo(ScoreLayer) 	
+	local CurStaticLabel = cc.Label:createWithSystemFont("当前分数", "Arial", 35)
+	CurStaticLabel:move((display.width - display.height)/2, display.height - 2*rectLen) -- 此处是相对scoreLayer左下角的位置
+	CurStaticLabel:addTo(ScoreLayer) 	
 
-	CurScoreLabel = cc.Label:createWithSystemFont(tostring(Board.GetMaxScore()), "Arial", 35)
+	CurScoreLabel = cc.Label:createWithSystemFont(tostring(Board.GetTotalScore()), "Arial", 35)
 	CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
 	CurScoreLabel:addTo(ScoreLayer)
 end
@@ -196,6 +268,12 @@ function MainScene:InitBoard()
 	if not Board.GetBoardData() then 
 		self:ResetBoard()
 	end
+	
+	MyRankLabel = cc.Label:createWithSystemFont("", "Arial", 35)
+	MyRankLabel:move((display.width - display.height)/2, display.height - 3*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MyRankLabel:addTo(ScoreLayer) 
+	
+	GetRankList()
 end
 
 local firstX = 0
@@ -256,11 +334,22 @@ local function onRelease(keyCode, event)
 	end
 end
 
+local function cat_string(str, len, expr)
+    if #str < len then
+        for i = 1, len - #str do
+            str =  str .. expr
+        end
+    end
+    return str
+end
+
 function MainScene:onCreate()
+-- [[
 	local welcomeSprite = display.newSprite("welcome.jpg")
     welcomeSprite:move(display.center)
     welcomeSprite:addTo(self, 100)
 	scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
+--]]
 	
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
@@ -271,6 +360,51 @@ function MainScene:onCreate()
     end)
 	resetBtn:setPosition(display.width - 80, display.height - 80)
 	resetBtn:addTo(self)
+	
+	local rankBtn = ccui.Button:create("rank_open.png", "rank_open.png", "rank_open.png")
+	rankBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			if not rankFlag then 
+				rankFlag = true 
+			
+				if not rankLayer then 
+					local color = cc.c4b(255, 0, 255, 255)
+					rankLayer = cc.LayerColor:create(color)
+					rankLayer:setContentSize(cc.size(display.height, display.height))
+					rankLayer:setPosition(cc.p(0, 0))
+					self:addChild(rankLayer, 101)
+					
+					for i = 1, 11 do 
+						local tablen = 15
+						local str = ""
+						if i == 1 then 
+							str = cat_string("RANK", tablen, " ") .. cat_string("ID", tablen, " ") .. cat_string("NAME", tablen, " ") .. cat_string("SCORE", tablen, " ")
+						else 
+							local userdata = ranklist[i-1]
+							str = cat_string(tostring(i-1), tablen, " ") .. cat_string(tostring(userdata.uid), tablen, " ") .. cat_string(tostring(userdata.name), tablen, " ") .. cat_string(tostring(userdata.score), tablen, " ")							
+						end
+						
+						local cx = display.height/2
+						local cy = (11-i)*display.height/11 + display.height/22
+						local userdata = ranklist[i-1]
+						local label = cc.Label:createWithSystemFont(str, "Arial", 25)
+						label:move(cx, cy)
+						label:addTo(rankLayer) 						
+					end 
+				else
+					rankLayer:setVisible(true)
+				end 
+				
+				rankBtn:loadTextures("rank_close.png", "rank_close.png");
+			else
+				rankFlag = false 
+				rankLayer:setVisible(false)
+				rankBtn:loadTextures("rank_open.png", "rank_open.png");
+			end 
+		end
+    end)
+	rankBtn:setPosition(display.width - 160, display.height - 80)
+	rankBtn:addTo(self)
 	
 	LoadUserData()
 	self:InitBoard()
