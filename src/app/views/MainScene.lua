@@ -74,6 +74,8 @@ end
 
 function MainScene:DrawBoard()
 	local boarddata = Board.GetBoardData()
+	if not boarddata then return end 
+	
 	for i = 1, 4 do 
 		for j = 1, 4 do 
 			local num = boarddata[i][j]
@@ -137,7 +139,7 @@ local function GetRankList()
 				print("ranlist ", v.uid, v.rank, v.name, v.score)
 				if v.uid == userdata.uid then 
 					myrank = v.rank
-					local str = "我的排名：" .. (myrank == 0 and "未上榜" or tostring(myrank))
+					local str = (myrank == 0 and "未上榜" or tostring(myrank))
 					MyRankLabel:setString(str)
 				end
 			end
@@ -207,7 +209,7 @@ function MainScene:AfterOperate(num, move)
 	end
 end
 
-local function LoadUserData()
+function MainScene:LoadUserData()
 	local str = cc.UserDefault:getInstance():getStringForKey("boarddata");
 	local str2 = cc.UserDefault:getInstance():getStringForKey("maxscore");
 	if str2 and str2 ~= "" then 
@@ -218,7 +220,7 @@ local function LoadUserData()
 		local boarddata = Board.decodedata(str)
 		 Board.SetBoardData(boarddata)
 	else
-		Board.SetBoardData(nil)
+		--self:ResetBoard()
 	end
 end
 
@@ -247,6 +249,14 @@ local function InitScoreLayer()
 	CurScoreLabel = cc.Label:createWithSystemFont(tostring(Board.GetTotalScore()), "Arial", 35)
 	CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
 	CurScoreLabel:addTo(ScoreLayer)
+	
+	local MyRankStaticLable = cc.Label:createWithSystemFont("我的排名", "Arial", 35)
+	MyRankStaticLable:move((display.width - display.height)/2, display.height - 3*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MyRankStaticLable:addTo(ScoreLayer) 
+	
+	MyRankLabel = cc.Label:createWithSystemFont("", "Arial", 35)
+	MyRankLabel:move((display.width - display.height)/2, display.height - 3.5*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MyRankLabel:addTo(ScoreLayer) 
 end
 
 function MainScene:InitBoard()
@@ -268,10 +278,6 @@ function MainScene:InitBoard()
 	if not Board.GetBoardData() then 
 		self:ResetBoard()
 	end
-	
-	MyRankLabel = cc.Label:createWithSystemFont("", "Arial", 35)
-	MyRankLabel:move((display.width - display.height)/2, display.height - 3*rectLen) -- 此处是相对scoreLayer左下角的位置
-	MyRankLabel:addTo(ScoreLayer) 
 	
 	GetRankList()
 end
@@ -344,12 +350,10 @@ local function cat_string(str, len, expr)
 end
 
 function MainScene:onCreate()
--- [[
 	local welcomeSprite = display.newSprite("welcome.jpg")
     welcomeSprite:move(display.center)
     welcomeSprite:addTo(self, 100)
 	scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
---]]
 	
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
@@ -372,7 +376,7 @@ function MainScene:onCreate()
 					rankLayer = cc.LayerColor:create(color)
 					rankLayer:setContentSize(cc.size(display.height, display.height))
 					rankLayer:setPosition(cc.p(0, 0))
-					self:addChild(rankLayer, 101)
+					self:addChild(rankLayer, 10)
 					
 					for i = 1, 11 do 
 						local tablen = 15
@@ -406,7 +410,7 @@ function MainScene:onCreate()
 	rankBtn:setPosition(display.width - 160, display.height - 80)
 	rankBtn:addTo(self)
 	
-	LoadUserData()
+	self:LoadUserData()
 	self:InitBoard()
 	
 	local dispatcher = cc.Director:getInstance():getEventDispatcher()

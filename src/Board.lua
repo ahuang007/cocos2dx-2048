@@ -50,8 +50,12 @@ function Board.decodedata(str)
 	return boarddata
 end 
 
-function Board.GetTotalScore(boardData)
-	boardData = boardData or BoardData
+function Board.GetTotalScore(boarddata)
+	boarddata = boarddata or BoardData
+	if not boarddata then 
+		return 0 
+	end
+	
 	local maxScore = 0
 	for i = 1, 4 do 
 		for j = 1, 4 do 
@@ -61,11 +65,12 @@ function Board.GetTotalScore(boardData)
 	return maxScore
 end
 
-function Board.InitBoardData(boarddata)
+function Board.InitBoardData()
+	BoardData = {}
 	for i = 1, 4 do 
 		BoardData[i] = {}
 		for j = 1, 4 do
-			BoardData[i][j] = boarddata and boarddata[i][j] or 0
+			BoardData[i][j] = 0
 		end
 	end
 end
