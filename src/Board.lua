@@ -56,14 +56,27 @@ function Board.GetTotalScore(boarddata)
 		return 0 
 	end
 	
+	local totalScore = 0
+	for i = 1, 4 do 
+		for j = 1, 4 do 
+			totalScore = totalScore + BoardData[i][j]
+		end 
+	end 
+	return totalScore
+end
+
+function Board.GetMaxNum()
+	if not BoardData then return 0 end 
 	local maxScore = 0
 	for i = 1, 4 do 
 		for j = 1, 4 do 
-			maxScore = maxScore + BoardData[i][j]
+			if BoardData[i][j] > maxScore then 
+				maxScore = BoardData[i][j]
+			end 
 		end 
 	end 
 	return maxScore
-end
+end 
 
 function Board.InitBoardData()
 	BoardData = {}

@@ -280,6 +280,8 @@ function MainScene:InitBoard()
 	end
 	
 	GetRankList()
+	
+	cc.SimpleAudioEngine:getInstance():playMusic("music_bg.mp3", true)
 end
 
 local firstX = 0
@@ -289,12 +291,14 @@ function MainScene:onTouchBegan(touch, event)
 	local beginPoint = touch:getLocation()
 	firstX = beginPoint.x
 	firstY = beginPoint.y
+	if rankFlag then return false end 
 	return true
 end 
 
 function MainScene:onTouchMoved(touch, event)
 	return true
 end 
+
 
 function MainScene:onTouchEnded(touch, event)
 	-- 纪录触摸终点坐标
@@ -304,6 +308,7 @@ function MainScene:onTouchEnded(touch, event)
 
 	-- 看是横向移动大还是纵向滑动大
 	local flag = false -- 滑动后发现有合并的 则新增数字
+	local beforeMaxNum = Board.GetMaxNum()
 	if math.abs(endX) > math.abs(endY) then 
 		if math.abs(endX) > 5 then -- 滑动太少不算
 			if endX > 0 then 
@@ -320,6 +325,15 @@ function MainScene:onTouchEnded(touch, event)
 				flag = Board.OnUp()
 			end	
 		end	
+	end
+	
+	if flag then 
+		local afterMaxNum = Board.GetMaxNum() 
+		if afterMaxNum > beforeMaxNum and afterMaxNum >= 128 then 
+			cc.SimpleAudioEngine:getInstance():playEffect("merge_special.mp3")
+		else
+			cc.SimpleAudioEngine:getInstance():playEffect("merge_normal.mp3")
+		end
 	end
 	
 	self:AfterOperate(1, flag)
