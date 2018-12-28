@@ -354,15 +354,6 @@ local function onRelease(keyCode, event)
 	end
 end
 
-local function cat_string(str, len, expr)
-    if #str < len then
-        for i = 1, len - #str do
-            str =  str .. expr
-        end
-    end
-    return str
-end
-
 function MainScene:onCreate()
 	local welcomeSprite = display.newSprite("welcome.jpg")
     welcomeSprite:move(display.center)
@@ -392,23 +383,37 @@ function MainScene:onCreate()
 					rankLayer:setPosition(cc.p(0, 0))
 					self:addChild(rankLayer, 10)
 					
-					for i = 1, 11 do 
-						local tablen = 15
-						local str = ""
-						if i == 1 then 
-							str = cat_string("RANK", tablen, " ") .. cat_string("ID", tablen, " ") .. cat_string("NAME", tablen, " ") .. cat_string("SCORE", tablen, " ")
-						else 
-							local userdata = ranklist[i-1]
-							str = cat_string(tostring(i-1), tablen, " ") .. cat_string(tostring(userdata.uid), tablen, " ") .. cat_string(tostring(userdata.name), tablen, " ") .. cat_string(tostring(userdata.score), tablen, " ")							
+					for i = 1, 11 do
+						for j = 1, 4 do 
+							local label = cc.Label:createWithSystemFont("", "Arial", 25)
+							label:setContentSize(cc.size(display.height/4, display.height/11))
+							label:setPosition(cc.p((j-1)*(display.height/4) + display.height/8, (11-i)*(display.height/11) + display.height/22))
+							rankLayer:addChild(label)
+							
+							if i == 1 then
+								if j == 1 then 
+									label:setString("排名")
+								elseif j == 2 then 
+									label:setString("ID")
+								elseif j == 3 then 
+									label:setString("昵称")
+								elseif j == 4 then 
+									label:setString("分数")
+								end 
+							else
+								local userdata = ranklist[i-1]
+								if j == 1 then 
+									label:setString(tostring(i-1))
+								elseif j == 2 then 
+									label:setString(tostring(userdata.uid))
+								elseif j == 3 then 
+									label:setString(tostring(userdata.name))
+								elseif j == 4 then 
+									label:setString(tostring(userdata.score))
+								end 							
+							end							
 						end
-						
-						local cx = display.height/2
-						local cy = (11-i)*display.height/11 + display.height/22
-						local userdata = ranklist[i-1]
-						local label = cc.Label:createWithSystemFont(str, "Arial", 25)
-						label:move(cx, cy)
-						label:addTo(rankLayer) 						
-					end 
+					end
 				else
 					rankLayer:setVisible(true)
 				end 
