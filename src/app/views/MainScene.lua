@@ -16,6 +16,7 @@ local rankLayer
 local ranklist = {}
 local myrank = 0
 local MyRankLabel
+local MusicFlag = true
 
 local rectLen = display.height/4
 
@@ -346,7 +347,7 @@ local function onRelease(keyCode, event)
 	if keyCode == cc.KeyCode.KEY_BACK then	
 		saveBoardData()
 		cc.Director:getInstance():endToLua()
-	elseif keyCode == cc.KeyCode.KEY_HOME then
+	elseif keyCode == cc.KeyCode.KEY_HOME or keyCode == cc.KeyCode.KEY_BACKSPACE then
 		saveBoardData()
 	elseif keyCode == cc.KeyCode.KEY_Q then
 		saveBoardData()
@@ -428,6 +429,25 @@ function MainScene:onCreate()
     end)
 	rankBtn:setPosition(display.width - 160, display.height - 80)
 	rankBtn:addTo(self)
+	
+	local soundBtn = ccui.Button:create("sound.png", "sound_off.png", "sound.png")
+	soundBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			if MusicFlag then 
+				MusicFlag = false 				
+				soundBtn:loadTextures("sound_off.png", "sound_off.png")
+				cc.SimpleAudioEngine:getInstance():pauseAllEffects()
+				cc.SimpleAudioEngine:getInstance():pauseMusic()				
+			else
+				MusicFlag = true 
+				soundBtn:loadTextures("sound.png", "sound.png")
+				cc.SimpleAudioEngine:getInstance():resumeAllEffects()
+				cc.SimpleAudioEngine:getInstance():resumeMusic()
+			end 
+		end
+    end)
+	soundBtn:setPosition(display.width - 220, display.height - 80)
+	soundBtn:addTo(self)
 	
 	self:LoadUserData()
 	self:InitBoard()
