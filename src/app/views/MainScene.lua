@@ -4,6 +4,7 @@ local utils = require "utils"
 local scheduler = require ("scheduler") -- 定时器
 local json = require "json"
 local Board = require "Board"
+local Storage = require "Storage"
 
 local BoardLayer 
 local ScoreLayer
@@ -155,7 +156,7 @@ local function CommitData2Server(score)
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
 	local url = string.format('http://%s:%d/CommitData?appid=1&data={"uid":%d,"name":"%s","headIcon":"%s","score":%d}', 
 	serverIp, port, userdata.uid, userdata.name, userdata.headIcon, score)
-	print("url ----------- ", url)
+	print("commitdata usrl ", url)
 	xhr:open("GET", url)
 	local function onResponse()
 		local str = xhr.response	--获得返回数据
@@ -171,14 +172,13 @@ local function CommitData2Server(score)
 end 
 
 local function saveBoardData()
+	Storage.setTable("boarddata", Board.GetBoardData())
 	local curMaxScore = Board.GetTotalScore()
-	local str = Board.encodedata()
-	cc.UserDefault:getInstance():setStringForKey("boarddata", str); 
 	if curMaxScore > MaxScore then 
 		MaxScore = curMaxScore
 		CommitData2Server(MaxScore)
 	end	
-	cc.UserDefault:getInstance():setStringForKey("maxscore", MaxScore);
+	Storage.setInt("maxScore", MaxScore)
 end
 
 function MainScene:AfterOperate(num, move)
@@ -211,18 +211,9 @@ function MainScene:AfterOperate(num, move)
 end
 
 function MainScene:LoadUserData()
-	local str = cc.UserDefault:getInstance():getStringForKey("boarddata");
-	local str2 = cc.UserDefault:getInstance():getStringForKey("maxscore");
-	if str2 and str2 ~= "" then 
-		MaxScore = tonumber(str2)
-	end 
-	
-	if str and str ~= "" then 
-		local boarddata = Board.decodedata(str)
-		 Board.SetBoardData(boarddata)
-	else
-		--self:ResetBoard()
-	end
+	MaxScore = Storage.getInt("maxscore") -- todo: 增加用户注册登录后 如果没有取到 则到排行榜取
+	local boarddata = Storage.getTable("boarddata")
+	Board.SetBoardData(boarddata)
 end
 
 function MainScene:RefreshScoreLayer()

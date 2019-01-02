@@ -27,6 +27,7 @@ local function MergeArr(arr)
 	end	
 end
 
+--[[
 function Board.encodedata(boarddata)
 	boarddata = boarddata or BoardData
 	local arr = {}
@@ -49,6 +50,7 @@ function Board.decodedata(str)
 	end 
 	return boarddata
 end 
+--]]
 
 function Board.GetTotalScore(boarddata)
 	boarddata = boarddata or BoardData
@@ -89,8 +91,12 @@ function Board.InitBoardData()
 end
 
 function Board.SetBoardData(data)
-	BoardData = data
-end 
+	if (not data) or (type(data) == "table" and #data ~= 4) then
+		BoardData = nil
+	else
+		BoardData = data
+	end
+end
 
 function Board.GetBoardData()
 	return BoardData
@@ -267,7 +273,7 @@ function Board.GenNewNum(num)
 	end
 	local newArr = utils.get_random_sublist(emptypos, num)
 	for _, v in ipairs(newArr) do 
-		BoardData[v[1]][v[2]] =  2 -- todo: µ±×î´óÊýÔö´ó Õâ¸öÖµ»á±ä»¯
+		BoardData[v[1]][v[2]] =  2 -- todo: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Öµï¿½ï¿½ä»¯
 	end
 end 
 

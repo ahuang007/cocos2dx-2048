@@ -18,7 +18,7 @@ end
 
 function Storage.getTable(key, defVal)
     defVal = defVal or {}
-    return cjson.decode(Storage.getString(key, json.encode(defVal)))
+    return json.decode(Storage.getString(key, json.encode(defVal)))
 end    
 
 -- string
@@ -37,7 +37,7 @@ function Storage.getString(key, defVal)
     end
 
     defVal = defVal or ""
-    return userDefault:getStringForKey(key, defVal)
+    return userDefault:getStringForKey(key, defVal) -- 第二个参数为默认值 
 end
 
 -- int
