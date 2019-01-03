@@ -5,12 +5,16 @@ local scheduler = require ("scheduler") -- 定时器
 local json = require "json"
 local Board = require "Board"
 local Storage = require "Storage"
+local GameConfig = require "GameConfig"
+local UserProfile = require "UserProfile"
+local GameMusic = require "GameMusic"
 
 local BoardLayer 
 local ScoreLayer
 local MaxScoreLabel
 local CurScoreLabel
 local OverLabel
+local soundBtn
 
 local rankFlag = false
 local rankLayer
@@ -20,24 +24,8 @@ local MyRankLabel
 local MusicFlag = true
 local SettingFlag = false
 
-local rectLen = display.height/4
-
--- 数字颜色
-local Num2Color = {
-	[2] 	= {238, 228, 218},
-	[4] 	= {236, 224, 200},
-	[8] 	= {242, 177, 121},
-	[16] 	= {245, 149, 99},
-	[32] 	= {247, 123, 97},
-	[64] 	= {246, 93,	 59},
-	[128] 	= {239, 206, 113},
-	[256] 	= {237, 205, 96}, 
-	[512] 	= {236, 200, 80}, 
-	[1024] 	= {237, 197, 63},
-	[2048] 	= {238, 194, 46},
-	[4096] 	= {0,   0,   0},
-}
-
+local rectLen = display.height/4 -- 单元格长度
+local Num2Color = GameConfig.Num2Color -- 数字颜色
 local MaxScore = 0
 local NumLabels = {} -- 数字组件
 
@@ -55,7 +43,6 @@ local function createLine(x1, y1, x2, y2)
 	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 4, cc.c4f(1,1,0,1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
 	BoardLayer:addChild(draw)
 end
-
 
 local function InitNumLabels()
 	for i = 1, 5 do -- 5竖
@@ -114,22 +101,11 @@ function MainScene:AddNum(num)
 	end
 end
 
--- todo: 增加配置文件
-local serverIp = '47.106.34.35' -- 排行榜服务器
-local port = 7100
-
--- todo: 新增玩家数据文件 step1：客户端随机生成并保存到文件 step2:增加登录服
-local userdata = { 
-	uid = 99944,
-	name = "ahuang007",
-	headIcon = "",
-}
-
 local function GetRankList()
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
 	local url = string.format('http://%s:%d/GetRankList?appid=1&data={"uid":%d,"startindex":%d,"endindex":%d}', 
-	serverIp, port, userdata.uid, 1, 10)
+	GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid, 1, 10)
 	print("GetRankList url ", url)
 	xhr:open("GET", url)
 	local function onResponse()
@@ -140,7 +116,7 @@ local function GetRankList()
 			ranklist = data.lists
 			for i, v in ipairs(ranklist) do 
 				print("ranlist ", v.uid, v.rank, v.name, v.score)
-				if v.uid == userdata.uid then 
+				if v.uid == UserProfile.uid then 
 					myrank = v.rank
 					local str = (myrank == 0 and "未上榜" or tostring(myrank))
 					MyRankLabel:setString(str)
@@ -156,7 +132,7 @@ local function CommitData2Server(score)
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
 	local url = string.format('http://%s:%d/CommitData?appid=1&data={"uid":%d,"name":"%s","headIcon":"%s","score":%d}', 
-	serverIp, port, userdata.uid, userdata.name, userdata.headIcon, score)
+	GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid, UserProfile.name, UserProfile.headIcon, score)
 	print("commitdata usrl ", url)
 	xhr:open("GET", url)
 	local function onResponse()
@@ -211,10 +187,25 @@ function MainScene:AfterOperate(num, move)
 	end
 end
 
+local function SetMusicSwitch(flag)
+	GameMusic.setEffectSwitch(flag)
+	GameMusic.setMusicSwitch(flag)
+	if flag then 
+		soundBtn:loadTextures("sound.png", "sound.png")
+		GameMusic.resumeMusic()	
+	else 
+		soundBtn:loadTextures("sound_off.png", "sound_off.png")
+		GameMusic.pauseMusic()	
+	end	
+	Storage.setBool("music", flag)
+end	
+
 function MainScene:LoadUserData()
 	MaxScore = Storage.getInt("maxscore") -- todo: 增加用户注册登录后 如果没有取到 则到排行榜取
 	local boarddata = Storage.getTable("boarddata")
 	Board.SetBoardData(boarddata)
+	MusicFlag = Storage.getBool("music", true) -- 首次打开是开启的
+	SetMusicSwitch(MusicFlag)
 end
 
 function MainScene:RefreshScoreLayer()
@@ -274,7 +265,7 @@ function MainScene:InitBoard()
 	
 	GetRankList()
 	
-	cc.SimpleAudioEngine:getInstance():playMusic("music_bg.mp3", true)
+	GameMusic.playMusic("music_bg.mp3", true)
 end
 
 local firstX = 0
@@ -323,14 +314,14 @@ function MainScene:onTouchEnded(touch, event)
 	if flag then 
 		local afterMaxNum = Board.GetMaxNum() 
 		if afterMaxNum > beforeMaxNum and afterMaxNum >= 128 then 
-			cc.SimpleAudioEngine:getInstance():playEffect("merge_special.mp3")
+			GameMusic.playEffect("merge_special.mp3")
 		else
-			cc.SimpleAudioEngine:getInstance():playEffect("merge_normal.mp3")
+			GameMusic.playEffect("merge_normal.mp3")
 		end
 	end
 	
 	self:AfterOperate(1, flag)
-end 
+end
 
 function MainScene:onTouchCancelled(touch, event)
 end
@@ -396,6 +387,11 @@ function MainScene:onCreate()
 								end 
 							else
 								local userdata = ranklist[i-1]
+								if userdata.uid == UserProfile.uid then 
+									local color = cc.c4b(0, 0, 0, 255)
+									label:setColor(color)
+								end	
+
 								if j == 1 then 
 									label:setString(tostring(i-1))
 								elseif j == 2 then 
@@ -424,20 +420,15 @@ function MainScene:onCreate()
 	rankBtn:setVisible(false)
 	rankBtn:addTo(self)
 	
-	local soundBtn = ccui.Button:create("sound.png", "sound_off.png", "sound.png")
+	soundBtn = ccui.Button:create("sound.png", "sound_off.png", "sound.png")
 	soundBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
 			if MusicFlag then 
 				MusicFlag = false 				
-				soundBtn:loadTextures("sound_off.png", "sound_off.png")
-				cc.SimpleAudioEngine:getInstance():pauseAllEffects()
-				cc.SimpleAudioEngine:getInstance():pauseMusic()				
 			else
 				MusicFlag = true 
-				soundBtn:loadTextures("sound.png", "sound.png")
-				cc.SimpleAudioEngine:getInstance():resumeAllEffects()
-				cc.SimpleAudioEngine:getInstance():resumeMusic()
 			end 
+			SetMusicSwitch(MusicFlag)
 		end
     end)
 	soundBtn:setPosition(display.width - 35, display.height - 245)
