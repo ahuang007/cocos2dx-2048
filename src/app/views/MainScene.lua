@@ -18,6 +18,7 @@ local ranklist = {}
 local myrank = 0
 local MyRankLabel
 local MusicFlag = true
+local SettingFlag = false
 
 local rectLen = display.height/4
 
@@ -129,7 +130,7 @@ local function GetRankList()
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
 	local url = string.format('http://%s:%d/GetRankList?appid=1&data={"uid":%d,"startindex":%d,"endindex":%d}', 
 	serverIp, port, userdata.uid, 1, 10)
-	print("url ----------- ", url)
+	print("GetRankList url ", url)
 	xhr:open("GET", url)
 	local function onResponse()
 		local str = xhr.response	--获得返回数据
@@ -359,7 +360,8 @@ function MainScene:onCreate()
 			self:ResetBoard()
 		end
     end)
-	resetBtn:setPosition(display.width - 80, display.height - 80)
+	resetBtn:setPosition(display.width - 35, display.height - 105)
+	resetBtn:setVisible(false)
 	resetBtn:addTo(self)
 	
 	local rankBtn = ccui.Button:create("rank_open.png", "rank_open.png", "rank_open.png")
@@ -418,7 +420,8 @@ function MainScene:onCreate()
 			end 
 		end
     end)
-	rankBtn:setPosition(display.width - 160, display.height - 80)
+	rankBtn:setPosition(display.width - 35, display.height - 175)
+	rankBtn:setVisible(false)
 	rankBtn:addTo(self)
 	
 	local soundBtn = ccui.Button:create("sound.png", "sound_off.png", "sound.png")
@@ -437,8 +440,28 @@ function MainScene:onCreate()
 			end 
 		end
     end)
-	soundBtn:setPosition(display.width - 220, display.height - 80)
+	soundBtn:setPosition(display.width - 35, display.height - 245)
+	soundBtn:setVisible(false)
 	soundBtn:addTo(self)
+
+	local settingBtn = ccui.Button:create("btn_setting.png", "btn_setting.png", "btn_setting.png")
+	settingBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			if not SettingFlag then 
+				SettingFlag = true
+				resetBtn:setVisible(true)
+				rankBtn:setVisible(true)
+				soundBtn:setVisible(true)
+			else 
+				SettingFlag = false	
+				resetBtn:setVisible(false)
+				rankBtn:setVisible(false)
+				soundBtn:setVisible(false)
+			end
+		end
+    end)
+	settingBtn:setPosition(display.width - 35, display.height - 35)
+	settingBtn:addTo(self)
 	
 	self:LoadUserData()
 	self:InitBoard()

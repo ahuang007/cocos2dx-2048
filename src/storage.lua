@@ -13,7 +13,7 @@ end
 
 -- table->json
 function Storage.setTable(key, val)
-    Storage.putString(key, json.encode(val))
+    Storage.setString(key, json.encode(val))
 end 
 
 function Storage.getTable(key, defVal)
