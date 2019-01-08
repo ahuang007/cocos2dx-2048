@@ -343,6 +343,11 @@ function MainScene:onCreate()
     welcomeSprite:move(display.center)
     welcomeSprite:addTo(self, 100)
 	scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
+
+	local LoginScene = cc.CSLoader:createNode("login/MainScene.csb")
+	LoginScene:move(0,0)
+	LoginScene:addTo(self, 99)
+	-- todo: 按钮控件增加响应事件 切换Layer
 	
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
