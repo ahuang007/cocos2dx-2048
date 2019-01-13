@@ -344,15 +344,34 @@ function MainScene:onCreate()
     welcomeSprite:addTo(self, 100)
 	scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
 
-	local LoginScene = cc.CSLoader:createNode("MainScene.csb")
-	LoginScene:move(0,0)
-	LoginScene:addTo(self, 101)
-	-- todo: 按钮控件增加响应事件 切换Layer
+	local MainScene = cc.CSLoader:createNode("MainScene.csb")
+	local RegScene
+	local LoginScene
+	MainScene:move(0,0)
+	MainScene:addTo(self, 110)
+	local regBtn = MainScene:getChildByName("btn_reg")
+	regBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			MainScene:setVisible(false)
+			RegScene = cc.CSLoader:createNode("Reg.csb")
+			RegScene:move(0,0)
+			RegScene:addTo(self, 110)
+		end
+	end)
+	local loginBtn = MainScene:getChildByName("btn_login")
+	loginBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			MainScene:setVisible(false)
+			LoginScene = cc.CSLoader:createNode("Login.csb")
+			LoginScene:move(0,0)
+			LoginScene:addTo(self, 110)
+		end
+	end)
+
 	
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
-			print("touch reset button....")
 			self:ResetBoard()
 		end
     end)
