@@ -4,7 +4,7 @@ local utils = require "utils"
 local scheduler = require ("scheduler") -- 定时器
 local json = require "json"
 local Board = require "Board"
-local Storage = require "Storage"
+local Storage = require "storage"
 local GameConfig = require "GameConfig"
 local UserProfile = require "UserProfile"
 local GameMusic = require "GameMusic"
@@ -248,12 +248,14 @@ function MainScene:InitBoard()
     BoardLayer = cc.LayerColor:create(color)
 	BoardLayer:setContentSize(cc.size(display.height, display.height))
 	BoardLayer:setPosition(cc.p(0, 0))
+	BoardLayer:setVisible(false)
 	self:addChild(BoardLayer, 1)
 	
 	local color1 = cc.c4b(255, 255, 0, 100)
     ScoreLayer = cc.LayerColor:create(color1)
 	ScoreLayer:setContentSize(cc.size(display.width - display.height, display.height))
 	ScoreLayer:setPosition(cc.p(display.height, 0))
+	ScoreLayer:setVisible(false)
 	self:addChild(ScoreLayer)
 
 	InitNumLabels()
@@ -339,35 +341,54 @@ local function onRelease(keyCode, event)
 end
 
 function MainScene:onCreate()
-	local welcomeSprite = display.newSprite("welcome.jpg")
-    welcomeSprite:move(display.center)
-    welcomeSprite:addTo(self, 100)
-	scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
+	-- local welcomeSprite = display.newSprite("welcome.jpg")
+    -- welcomeSprite:move(display.center)
+    -- welcomeSprite:addTo(self, 100)
+	-- scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
 
-	local MainScene = cc.CSLoader:createNode("MainScene.csb")
-	local RegScene
-	local LoginScene
-	MainScene:move(0,0)
-	MainScene:addTo(self, 110)
-	local regBtn = MainScene:getChildByName("btn_reg")
+	local HomeScene = cc.CSLoader:createNode("Home.csb")
+	HomeScene:move(0,0)
+	HomeScene:addTo(self, 110)
+	local RegScene = cc.CSLoader:createNode("Reg.csb")
+	RegScene:setVisible(false)
+	RegScene:move(0,0)
+	RegScene:addTo(self, 110)
+	local LoginScene = cc.CSLoader:createNode("Login.csb")
+	LoginScene:setVisible(false)
+	LoginScene:move(0,0)
+	LoginScene:addTo(self, 110)
+
+	local regBtn = HomeScene:getChildByName("btn_reg")
 	regBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
-			MainScene:setVisible(false)
-			RegScene = cc.CSLoader:createNode("Reg.csb")
-			RegScene:move(0,0)
-			RegScene:addTo(self, 110)
-		end
-	end)
-	local loginBtn = MainScene:getChildByName("btn_login")
-	loginBtn:addTouchEventListener(function(sender,eventType)
-		if eventType == ccui.TouchEventType.ended then
-			MainScene:setVisible(false)
-			LoginScene = cc.CSLoader:createNode("Login.csb")
-			LoginScene:move(0,0)
-			LoginScene:addTo(self, 110)
+			HomeScene:setVisible(false)
+			RegScene:setVisible(true)
 		end
 	end)
 
+	local loginBtn = HomeScene:getChildByName("btn_login")
+	loginBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			HomeScene:setVisible(false)
+			LoginScene:setVisible(true)
+		end
+	end)
+
+	local loginBackBtn = LoginScene:getChildByName("btn_back")
+	loginBackBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			HomeScene:setVisible(true)
+			LoginScene:setVisible(false)
+		end
+	end)
+
+	local regBackBtn = RegScene:getChildByName("btn_back")
+	regBackBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			HomeScene:setVisible(true)
+			RegScene:setVisible(false)
+		end
+	end)
 	
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
