@@ -3,6 +3,7 @@
 ### 用cocos2dx-lua 编写2048游戏 
 
 * cocos2dx版本:3.13
+* 账号服务器代码[accountserver]: https://github.com/ahuang007/skynet-accountserver
 * 排行榜服务器代码[rankserver]: https://github.com/ahuang007/skynet-rankserver
 * 目标： 
     - 入门cocos
