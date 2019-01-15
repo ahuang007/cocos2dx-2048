@@ -27,31 +27,6 @@ local function MergeArr(arr)
 	end	
 end
 
---[[
-function Board.encodedata(boarddata)
-	boarddata = boarddata or BoardData
-	local arr = {}
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			table.insert(arr, boarddata[i][j])
-		end 
-	end 	
-	return table.concat(arr, ",")
-end 
-
-function Board.decodedata(str)
-	local boarddata = {}
-	local arr = utils.split(str, ",")
-	for i = 1, 4 do 
-		boarddata[i] = {}
-		for j = 1, 4 do 
-			table.insert(boarddata[i], tonumber(arr[(i-1)*4+j]))
-		end 
-	end 
-	return boarddata
-end 
---]]
-
 function Board.GetTotalScore(boarddata)
 	boarddata = boarddata or BoardData
 	if not boarddata then 

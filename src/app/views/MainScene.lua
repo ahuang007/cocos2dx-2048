@@ -61,7 +61,6 @@ local function InitNumLabels()
 	end
 end	
 
-
 function MainScene:DrawBoard()
 	local boarddata = Board.GetBoardData()
 	if not boarddata then return end 
