@@ -3,6 +3,7 @@ cc.FileUtils:getInstance():setPopupNotify(false)
 cc.FileUtils:getInstance():addSearchPath("src/")
 cc.FileUtils:getInstance():addSearchPath("res/")
 cc.FileUtils:getInstance():addSearchPath("src/app/common/")
+cc.FileUtils:getInstance():addSearchPath("src/app/games/2048")
 
 require "config"
 require "cocos.init"
