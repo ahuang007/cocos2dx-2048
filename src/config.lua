@@ -15,19 +15,19 @@ CC_DISABLE_GLOBAL = true
 CC_DESIGN_RESOLUTION = {
     width = 1280,
     height = 720,
-    -- autoscale = "SHOW_ALL",
-    autoscale = "FIXED_HEIGHT",
+    autoscale = "SHOW_ALL",
+    -- autoscale = "FIXED_HEIGHT",
 	-- autoscale = "FIXED_WIDTH",
-    callback = function(framesize)
-        local ratio = framesize.width / framesize.height
-        if ratio > 1280/720 then
-            if platform == "ios" then
-                return {autoscale = "SHOW_ALL"} -- 暂时不考虑iPhone X
-            else
-                return {autoscale = "FIXED_HEIGHT"}
-            end
-        else
-            return {autoscale = "FIXED_WIDTH"}
-        end
-    end
+    -- callback = function(framesize)
+    --     local ratio = framesize.width / framesize.height
+    --     if ratio > 1280/720 then
+    --         if platform == "ios" then
+    --             return {autoscale = "SHOW_ALL"} -- 暂时不考虑iPhone X
+    --         else
+    --             return {autoscale = "FIXED_HEIGHT"}
+    --         end
+    --     else
+    --         return {autoscale = "FIXED_WIDTH"}
+    --     end
+    -- end
 }

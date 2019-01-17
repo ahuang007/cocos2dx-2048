@@ -211,7 +211,15 @@ function MainScene:LoadUserData()
 	local password = Storage.getString("password")
 	if password then 
 		UserProfile.password = password 
-	end 	
+	end 
+	
+	if account and password then 
+		HomeScene:setVisible(false)
+		LoginScene:setVisible(true)
+		LoginScene:getChildByName("TextField_account"):setString(account)
+		LoginScene:getChildByName("TextField_password"):setString(password)
+	end
+
 	MaxScore = Storage.getInt("maxscore") -- todo: 增加用户注册登录后 如果没有取到 则取账号服数据
 	local boarddata = Storage.getTable("boarddata")
 	Board.SetBoardData(boarddata)
