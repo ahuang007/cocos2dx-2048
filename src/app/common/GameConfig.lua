@@ -5,7 +5,7 @@ local GameConfig = {
 	RankSrvPort = 7100,   
 	-- 账号服务
 	AccountSrvIp = '47.106.34.35',
-	AccountSrvPort = 9100,
+	AccountSrvPort = 9101,
 }
 
 -- 数字颜色

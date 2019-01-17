@@ -9,6 +9,9 @@ local GameConfig = require "GameConfig"
 local UserProfile = require "UserProfile"
 local GameMusic = require "GameMusic"
 
+local HomeScene
+local LoginScene
+local RegScene
 local BoardLayer 
 local ScoreLayer
 local MaxScoreLabel
@@ -28,6 +31,7 @@ local rectLen = display.height/4 -- 单元格长度
 local Num2Color = GameConfig.Num2Color -- 数字颜色
 local MaxScore = 0
 local NumLabels = {} -- 数字组件
+
 
 local function createNum(idx, idy)
 	local cx = (idx-1)*rectLen +rectLen/2 
@@ -103,8 +107,7 @@ end
 local function GetRankList()
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
-	local url = string.format('http://%s:%d/GetRankList?appid=1&data={"uid":%d,"startindex":%d,"endindex":%d}', 
-	GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid, 1, 10)
+	local url = string.format('http://%s:%d/GetRankList?appid=1&data={"uid":%d,"startindex":%d,"endindex":%d}', GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid or 0, 1, 10)
 	print("GetRankList url ", url)
 	xhr:open("GET", url)
 	local function onResponse()
@@ -127,19 +130,18 @@ local function GetRankList()
 	xhr:send()	--发送 
 end 
 
-local function CommitData2Server(score)
+local function CommitData2RankServer(score)
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
-	local url = string.format('http://%s:%d/CommitData?appid=1&data={"uid":%d,"name":"%s","headIcon":"%s","score":%d}', 
-	GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid, UserProfile.name, UserProfile.headIcon, score)
-	print("commitdata usrl ", url)
+	local url = string.format('http://%s:%d/CommitData?appid=1&data={"uid":%d,"name":"%s","headIcon":"%s","score":%d}', GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid, UserProfile.name, UserProfile.headIcon, score)
+	print("CommitData2RankServer usrl ", url)
 	xhr:open("GET", url)
 	local function onResponse()
 		local str = xhr.response	--获得返回数据
-		print("CommitData2Server resp", str)
+		print("CommitData2RankServer resp", str)
 		local data = json.decode(str)
 		if data.status == 0 then 
-			print("commitdata ok!", score)
+			print("CommitData2RankServer ok!", score)
 			GetRankList()
 		end 
 	end
@@ -152,7 +154,9 @@ local function saveBoardData()
 	local curMaxScore = Board.GetTotalScore()
 	if curMaxScore > MaxScore then 
 		MaxScore = curMaxScore
-		CommitData2Server(MaxScore)
+		if UserProfile.uid then 
+			CommitData2RankServer(MaxScore)
+		end 	
 	end	
 	Storage.setInt("maxScore", MaxScore)
 end
@@ -180,7 +184,7 @@ function MainScene:AfterOperate(num, move)
 			if curScore >= MaxScore then 
 				MaxScore = curScore
 				saveBoardData()
-				CommitData2Server(MaxScore)
+				CommitData2RankServer(MaxScore)
 			end
 		end
 	end
@@ -200,7 +204,15 @@ local function SetMusicSwitch(flag)
 end	
 
 function MainScene:LoadUserData()
-	MaxScore = Storage.getInt("maxscore") -- todo: 增加用户注册登录后 如果没有取到 则到排行榜取
+	local account =	Storage.getString("account")
+	if account then 
+		UserProfile.name = account 
+	end 	
+	local password = Storage.getString("password")
+	if password then 
+		UserProfile.password = password 
+	end 	
+	MaxScore = Storage.getInt("maxscore") -- todo: 增加用户注册登录后 如果没有取到 则取账号服数据
 	local boarddata = Storage.getTable("boarddata")
 	Board.SetBoardData(boarddata)
 	MusicFlag = Storage.getBool("music", true) -- 首次打开是开启的
@@ -263,8 +275,6 @@ function MainScene:InitBoard()
 	if not Board.GetBoardData() then 
 		self:ResetBoard()
 	end
-	
-	GetRankList()
 	
 	GameMusic.playMusic("music_bg.mp3", true)
 end
@@ -339,20 +349,47 @@ local function onRelease(keyCode, event)
 	end
 end
 
-function MainScene:onCreate()
-	-- local welcomeSprite = display.newSprite("welcome.jpg")
-    -- welcomeSprite:move(display.center)
-    -- welcomeSprite:addTo(self, 100)
-	-- scheduler.performWithDelayGlobal(function() welcomeSprite:removeFromParent(true) end, 1.5) -- 欢迎界面1s消失
+local function LoginCommit2AccountServer(account, password)
+	local xhr = cc.XMLHttpRequest:new()	--http请求
+	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
+	local url = string.format('http://%s:%d/login?appid=1&data={"account":"%s","password":"%s"}', GameConfig.AccountSrvIp, GameConfig.AccountSrvPort, account, password)
+	print("LoginCommit2AccountServer usrl ", url)
+	xhr:open("GET", url)
+	local function onResponse()
+		local str = xhr.response	--获得返回数据
+		print("LoginCommit2AccountServer resp", str)
+		local data = json.decode(str)
+		if data.status == 0 then 
+			print("Login ok!", account, data.session)
+			UserProfile.uid = data.uid
+			UserProfile.name = account
+			if not Storage.getString("account") then 
+				Storage.setString("account", account)
+			end 
+			if not Storage.getString("password") then 
+				Storage.setString("password", password)
+			end
+			LoginScene:setVisible(false)
+			GetRankList()
+			BoardLayer:setVisible(true)
+			ScoreLayer:setVisible(true)
+		end
+	end
+	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
+	xhr:send()	--发送
+end
 
-	local HomeScene = cc.CSLoader:createNode("Home.csb")
+function MainScene:onCreate()
+	HomeScene = cc.CSLoader:createNode("Home.csb")
 	HomeScene:move(0,0)
 	HomeScene:addTo(self, 110)
-	local RegScene = cc.CSLoader:createNode("Reg.csb")
+	
+	RegScene = cc.CSLoader:createNode("Reg.csb")
 	RegScene:setVisible(false)
 	RegScene:move(0,0)
 	RegScene:addTo(self, 110)
-	local LoginScene = cc.CSLoader:createNode("Login.csb")
+	
+	LoginScene = cc.CSLoader:createNode("Login.csb")
 	LoginScene:setVisible(false)
 	LoginScene:move(0,0)
 	LoginScene:addTo(self, 110)
@@ -370,6 +407,15 @@ function MainScene:onCreate()
 		if eventType == ccui.TouchEventType.ended then
 			HomeScene:setVisible(false)
 			LoginScene:setVisible(true)
+		end
+	end)
+
+	local loginConfirmBtn = LoginScene:getChildByName("btn_confirm")
+	loginConfirmBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			local account = LoginScene:getChildByName("TextField_account"):getString() -- trim / check
+			local password = LoginScene:getChildByName("TextField_password"):getString() -- trim / check
+			LoginCommit2AccountServer(account, password)
 		end
 	end)
 
