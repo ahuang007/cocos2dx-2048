@@ -353,7 +353,7 @@ local function LoginCommit2AccountServer(account, password)
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
 	local url = string.format('http://%s:%d/login?appid=1&data={"account":"%s","password":"%s"}', GameConfig.AccountSrvIp, GameConfig.AccountSrvPort, account, password)
-	print("LoginCommit2AccountServer usrl ", url)
+	print("LoginCommit2AccountServer url ", url)
 	xhr:open("GET", url)
 	local function onResponse()
 		local str = xhr.response	--获得返回数据
@@ -373,6 +373,31 @@ local function LoginCommit2AccountServer(account, password)
 			GetRankList()
 			BoardLayer:setVisible(true)
 			ScoreLayer:setVisible(true)
+		end
+	end
+	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
+	xhr:send()	--发送
+end
+
+local function RegCommit2AccountServer(account, password)
+	local xhr = cc.XMLHttpRequest:new()	--http请求
+	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
+	local url = string.format('http://%s:%d/register?appid=1&data={"account":"%s","password":"%s"}', GameConfig.AccountSrvIp, GameConfig.AccountSrvPort, account, password)
+	print("RegCommit2AccountServer url ", url)
+	xhr:open("GET", url)
+	local function onResponse()
+		local str = xhr.response	--获得返回数据
+		print("RegCommit2AccountServer resp", str)
+		local data = json.decode(str)
+		if data.status == 0 then 
+			print("Reg ok!", account, password)
+			UserProfile.name = account
+			Storage.setString("account", account)
+			LoginScene:getChildByName("TextField_account"):setString(account)
+			Storage.setString("password", password)
+			LoginScene:getChildByName("TextField_password"):setString(password)
+			RegScene:setVisible(false)
+			LoginScene:setVisible(true)
 		end
 	end
 	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
@@ -416,6 +441,21 @@ function MainScene:onCreate()
 			local account = LoginScene:getChildByName("TextField_account"):getString() -- trim / check
 			local password = LoginScene:getChildByName("TextField_password"):getString() -- trim / check
 			LoginCommit2AccountServer(account, password)
+		end
+	end)
+
+	local regConfirmBtn = RegScene:getChildByName("Panel_5"):getChildByName("btn_confirm")
+	regConfirmBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			RegScene:getChildByName("Panel_5"):getChildByName("Text_2"):setVisible(false) -- 目前放这 后续改到填完密码的回调
+			local account = RegScene:getChildByName("Panel_5"):getChildByName("TextField_account"):getString() -- trim / check
+			local password = RegScene:getChildByName("Panel_5"):getChildByName("TextField_password"):getString() -- trim / check
+			local password2 = RegScene:getChildByName("Panel_5"):getChildByName("TextField_password2"):getString() -- trim / check
+			if password ~= password2 then 
+				RegScene:getChildByName("Panel_5"):getChildByName("Text_2"):setVisible(true)
+			else 
+				RegCommit2AccountServer(account, password)
+			end	
 		end
 	end)
 
