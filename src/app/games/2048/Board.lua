@@ -243,18 +243,22 @@ end
 
 function Board.GenNewNum(num)
 	local emptypos = {}
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			if BoardData[i][j] == 0 then 
+	for i = 1, 4 do
+		for j = 1, 4 do
+			if BoardData[i][j] == 0 then
 				table.insert(emptypos, {i, j})
-			end 	
-		end	
+			end
+		end
 	end
 	local newArr = utils.get_random_sublist(emptypos, num)
-	for _, v in ipairs(newArr) do 
-		BoardData[v[1]][v[2]] =  2 -- todo: ����������� ���ֵ��仯
+	for _, v in ipairs(newArr) do
+		if math.random(1, 100) > 5 then
+			BoardData[v[1]][v[2]] =  2
+		else
+			BoardData[v[1]][v[2]] =  4
+		end
 	end
-end 
+end
 
 function Board.isBoardEnd()
 	if Board.GetNumCount() < 16 then 

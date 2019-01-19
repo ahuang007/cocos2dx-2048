@@ -168,7 +168,7 @@ function MainScene:AfterOperate(num, move)
 		self:DrawBoard()
 		self:RefreshScoreLayer()
 		-- 新出来的数字 延迟0.5s显示
-		scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.5) -- 定时器:只执行一次
+		scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.3) -- 定时器:只执行一次
 	else 
 		if Board.isBoardEnd() then -- 重置确认弹框
 			if not ResetLayer then 	
@@ -333,7 +333,8 @@ function MainScene:onTouchEnded(touch, event)
 	if flag then 
 		local afterMaxNum, idx, idy = Board.GetMaxNum() 
 		if afterMaxNum > beforeMaxNum and afterMaxNum >= 4 then 
-			local particle = cc.ParticleSystemQuad:create("defaultParticle.plist") --创建粒子系统
+			--local particle = cc.ParticleSystemQuad:create("defaultParticle.plist") --自定义粒子
+			local particle = cc.ParticleExplosion:create() -- 默认粒子
 			local cx = (idx-1)*rectLen +rectLen/2 
 			local cy = (idy-1)*rectLen +rectLen/2 
 			particle:move(cx, cy)
