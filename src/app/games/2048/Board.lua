@@ -45,14 +45,18 @@ end
 function Board.GetMaxNum()
 	if not BoardData then return 0 end 
 	local maxScore = 0
+	local idx 
+	local idy 
 	for i = 1, 4 do 
 		for j = 1, 4 do 
 			if BoardData[i][j] > maxScore then 
 				maxScore = BoardData[i][j]
+				idx = i 
+				idy = j
 			end 
 		end 
 	end 
-	return maxScore
+	return maxScore, idx, idy
 end 
 
 function Board.InitBoardData()

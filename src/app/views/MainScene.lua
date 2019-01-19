@@ -14,6 +14,8 @@ local LoginScene
 local RegScene
 local BoardLayer 
 local ScoreLayer
+local ResetLayer
+
 local MaxScoreLabel
 local CurScoreLabel
 local OverLabel
@@ -168,24 +170,22 @@ function MainScene:AfterOperate(num, move)
 		-- 新出来的数字 延迟0.5s显示
 		scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.5) -- 定时器:只执行一次
 	else 
-		if Board.isBoardEnd() then -- todo: 重置确认弹框
-			print("2048 game is over, Do you want to reset ? ")	
-			if not OverLabel then 
-				OverLabel = cc.Label:createWithSystemFont("GAME OVER", "Arial", 60)
-				OverLabel:move(display.height/2, display.height/2)
-				local color = cc.c4b(0, 0, 0, 100)
-				OverLabel:setColor(color)
-				OverLabel:addTo(BoardLayer)			
-			else
-				OverLabel:setString("GAME OVER")
-			end
-			
-			local curScore = Board.GetTotalScore()
-			if curScore >= MaxScore then 
-				MaxScore = curScore
-				saveBoardData()
-				CommitData2RankServer(MaxScore)
-			end
+		if Board.isBoardEnd() then -- 重置确认弹框
+			if not ResetLayer then 	
+				ResetLayer = cc.CSLoader:createNode("Reset.csb")
+				ResetLayer:move(display.height/2 - 250, display.height/2 - 250)
+				ResetLayer:addTo(self, 200)
+			else 	
+				ResetLayer:setVisible(true)
+			end	
+
+			local startBtn = ResetLayer:getChildByName("btn_start")
+			startBtn:addTouchEventListener(function(sender,eventType)
+				if eventType == ccui.TouchEventType.ended then
+					self:ResetBoard()
+					ResetLayer:setVisible(false)
+				end
+			end)
 		end
 	end
 end
@@ -220,7 +220,7 @@ function MainScene:LoadUserData()
 		LoginScene:getChildByName("TextField_password"):setString(password)
 	end
 
-	MaxScore = Storage.getInt("maxscore") -- todo: 增加用户注册登录后 如果没有取到 则取账号服数据
+	MaxScore = Storage.getInt("maxScore") -- fixme: 增加用户注册登录后 如果没有取到 则取账号服数据
 	local boarddata = Storage.getTable("boarddata")
 	Board.SetBoardData(boarddata)
 	MusicFlag = Storage.getBool("music", true) -- 首次打开是开启的
@@ -331,8 +331,15 @@ function MainScene:onTouchEnded(touch, event)
 	end
 	
 	if flag then 
-		local afterMaxNum = Board.GetMaxNum() 
-		if afterMaxNum > beforeMaxNum and afterMaxNum >= 128 then 
+		local afterMaxNum, idx, idy = Board.GetMaxNum() 
+		if afterMaxNum > beforeMaxNum and afterMaxNum >= 4 then 
+			local particle = cc.ParticleSystemQuad:create("defaultParticle.plist") --创建粒子系统
+			local cx = (idx-1)*rectLen +rectLen/2 
+			local cy = (idy-1)*rectLen +rectLen/2 
+			particle:move(cx, cy)
+			BoardLayer:addChild(particle)
+			scheduler.performWithDelayGlobal(function() particle:removeFromParent() end, 1) -- 定时器:只执行一次
+
 			GameMusic.playEffect("merge_special.mp3")
 		else
 			GameMusic.playEffect("merge_normal.mp3")
