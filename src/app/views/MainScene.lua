@@ -31,7 +31,8 @@ local SettingFlag = false
 
 local rectLen = display.height/4 -- 单元格长度
 local Num2Color = GameConfig.Num2Color -- 数字颜色
-local MaxScore = 0
+local MaxScore = 0 -- 历史最高分
+local CurScore = 0 -- 当前分数 
 local NumLabels = {} -- 数字组件
 
 
@@ -96,6 +97,7 @@ function MainScene:ResetBoard()
 		OverLabel:setString("")
 	end	
 	Board.InitBoardData()
+	CurScore = 0 
 	self:AfterOperate(2, true)
 end
 
@@ -122,8 +124,7 @@ local function GetRankList()
 				print("ranlist ", v.uid, v.rank, v.name, v.score)
 				if v.uid == UserProfile.uid then 
 					myrank = v.rank
-					local str = (myrank == 0 and "未上榜" or tostring(myrank))
-					MyRankLabel:setString(str)
+					MyRankLabel:setString(tostring(myrank))
 				end
 			end
 		end 
@@ -153,14 +154,14 @@ end
 
 local function saveBoardData()
 	Storage.setTable("boarddata", Board.GetBoardData())
-	local curMaxScore = Board.GetTotalScore()
-	if curMaxScore > MaxScore then 
-		MaxScore = curMaxScore
+	if CurScore >= MaxScore then 
+		MaxScore = CurScore
 		if UserProfile.uid then 
 			CommitData2RankServer(MaxScore)
 		end 	
 	end	
 	Storage.setInt("maxScore", MaxScore)
+	Storage.setInt("curScore", CurScore)
 end
 
 function MainScene:AfterOperate(num, move)
@@ -220,20 +221,20 @@ function MainScene:LoadUserData()
 		LoginScene:getChildByName("TextField_password"):setString(password)
 	end
 
-	MaxScore = Storage.getInt("maxScore") -- fixme: 增加用户注册登录后 如果没有取到 则取账号服数据
-	local boarddata = Storage.getTable("boarddata")
-	Board.SetBoardData(boarddata)
+	MaxScore = Storage.getInt("maxScore", 0) -- fixme: 增加用户注册登录后 如果没有取到 则取账号服数据
+	CurScore = Storage.getInt("curScore", 0) -- 当前分数 取本地分数
+	Board.SetBoardData(Storage.getTable("boarddata"))
 	MusicFlag = Storage.getBool("music", true) -- 首次打开是开启的
 	SetMusicSwitch(MusicFlag)
 end
 
 function MainScene:RefreshScoreLayer()
-	local curMaxScore = Board.GetTotalScore()
-	if MaxScore < curMaxScore then 
-		MaxScore = curMaxScore
+	if MaxScore < CurScore then 
+		MaxScore = CurScore
 	end	
+
 	MaxScoreLabel:setString(tostring(MaxScore))
-	CurScoreLabel:setString(tostring(curMaxScore))
+	CurScoreLabel:setString(tostring(CurScore))
 end
 
 local function InitScoreLayer()
@@ -241,25 +242,31 @@ local function InitScoreLayer()
 	MaxStaticLabel:move((display.width - display.height)/2, display.height - 1*rectLen) -- 此处是相对scoreLayer左下角的位置
 	MaxStaticLabel:addTo(ScoreLayer) 	
 	
-	MaxScoreLabel = cc.Label:createWithSystemFont(tostring(MaxScore), "Arial", 35)
-	MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen) 
-	MaxScoreLabel:addTo(ScoreLayer) 	
-	
+	MaxScoreLabel = ccui.TextBMFont:create()
+    MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen)
+    MaxScoreLabel:addTo(ScoreLayer)
+	MaxScoreLabel:setFntFile("font_number.fnt")
+	MaxScoreLabel:setString(tostring(MaxScore))
+
 	local CurStaticLabel = cc.Label:createWithSystemFont("当前分数", "Arial", 35)
 	CurStaticLabel:move((display.width - display.height)/2, display.height - 2*rectLen) -- 此处是相对scoreLayer左下角的位置
 	CurStaticLabel:addTo(ScoreLayer) 	
 
-	CurScoreLabel = cc.Label:createWithSystemFont(tostring(Board.GetTotalScore()), "Arial", 35)
-	CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
-	CurScoreLabel:addTo(ScoreLayer)
+	CurScoreLabel = ccui.TextBMFont:create()
+    CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
+    CurScoreLabel:addTo(ScoreLayer)
+	CurScoreLabel:setFntFile("font_number.fnt")
+	CurScoreLabel:setString(tostring(CurScore))
 	
 	local MyRankStaticLable = cc.Label:createWithSystemFont("我的排名", "Arial", 35)
 	MyRankStaticLable:move((display.width - display.height)/2, display.height - 3*rectLen) -- 此处是相对scoreLayer左下角的位置
 	MyRankStaticLable:addTo(ScoreLayer) 
 	
-	MyRankLabel = cc.Label:createWithSystemFont("", "Arial", 35)
-	MyRankLabel:move((display.width - display.height)/2, display.height - 3.5*rectLen) -- 此处是相对scoreLayer左下角的位置
-	MyRankLabel:addTo(ScoreLayer) 
+	MyRankLabel = ccui.TextBMFont:create()
+    MyRankLabel:move((display.width - display.height)/2, display.height - 3.5*rectLen)
+    MyRankLabel:addTo(ScoreLayer)
+	MyRankLabel:setFntFile("font_number.fnt")
+	MyRankLabel:setString(tostring(0))
 end
 
 function MainScene:InitBoard()
@@ -302,7 +309,6 @@ function MainScene:onTouchMoved(touch, event)
 	return true
 end 
 
-
 function MainScene:onTouchEnded(touch, event)
 	-- 纪录触摸终点坐标
 	local endPoint = touch:getLocation()
@@ -311,21 +317,22 @@ function MainScene:onTouchEnded(touch, event)
 
 	-- 看是横向移动大还是纵向滑动大
 	local flag = false -- 滑动后发现有合并的 则新增数字
+	local mergeScore = 0
 	local beforeMaxNum = Board.GetMaxNum()
 	if math.abs(endX) > math.abs(endY) then 
 		if math.abs(endX) > 5 then -- 滑动太少不算
 			if endX > 0 then 
-				 flag = Board.OnLeft()
+				 flag, mergeScore = Board.OnLeft()
 			else 
-				flag = Board.OnRight()
+				flag, mergeScore = Board.OnRight()
 			end
 		end		
 	else 
 		if math.abs(endY) > 5 then -- 滑动太少不算
 			if endY > 0 then 
-				flag = Board.OnDown()
+				flag, mergeScore = Board.OnDown()
 			else 
-				flag = Board.OnUp()
+				flag, mergeScore = Board.OnUp()
 			end	
 		end	
 	end
@@ -333,8 +340,8 @@ function MainScene:onTouchEnded(touch, event)
 	if flag then 
 		local afterMaxNum, idx, idy = Board.GetMaxNum() 
 		if afterMaxNum > beforeMaxNum and afterMaxNum >= 4 then 
-			--local particle = cc.ParticleSystemQuad:create("defaultParticle.plist") --自定义粒子
-			local particle = cc.ParticleExplosion:create() -- 默认粒子
+			--local particle = cc.ParticleSystemQuad:create("defaultParticle.plist") --自定义粒子效果
+			local particle = cc.ParticleExplosion:create() -- 默认粒子效果
 			local cx = (idx-1)*rectLen +rectLen/2 
 			local cy = (idy-1)*rectLen +rectLen/2 
 			particle:move(cx, cy)
@@ -346,7 +353,8 @@ function MainScene:onTouchEnded(touch, event)
 			GameMusic.playEffect("merge_normal.mp3")
 		end
 	end
-	
+
+	CurScore = CurScore + mergeScore -- 分数增加
 	self:AfterOperate(1, flag)
 end
 

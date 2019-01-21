@@ -6,14 +6,16 @@ local BoardData
 
 local function MergeArr(arr)
 	local canMerge = false 
+	local score = 0
 	if #arr <= 1 then 
-		return arr, canMerge 
+		return arr, 0, canMerge 
 	elseif #arr >= 2 then 	
 		local markIndex = 0
 		local tmpArr = {}
 		for i = 1, #arr do 
 			if i >= markIndex then
 				if arr[i] == arr[i+1] then 
+					score = score + 2 * arr[i]
 					canMerge = true
 					table.insert(tmpArr, arr[i] + arr[i+1])
 					markIndex = i+2
@@ -23,10 +25,11 @@ local function MergeArr(arr)
 				end
 			end
 		end
-		return tmpArr, canMerge
+		return tmpArr,  score, canMerge
 	end	
 end
 
+--[[ -- 分数计算规则改变 原来是面板总和相加 现在改成合并多少分数加多少 
 function Board.GetTotalScore(boarddata)
 	boarddata = boarddata or BoardData
 	if not boarddata then 
@@ -41,6 +44,7 @@ function Board.GetTotalScore(boarddata)
 	end 
 	return totalScore
 end
+--]]
 
 function Board.GetMaxNum()
 	if not BoardData then return 0 end 
@@ -95,16 +99,19 @@ end
 
 function Board.OnLeft()
 	local move = false
+	local mergeScore = 0
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
+		local addScore = 0
 		for j = 1, 4 do
 			if BoardData[j][i] > 0 then
 				table.insert(arr, BoardData[j][i])
 			end	
 			table.insert(oldArr, BoardData[j][i])
 		end
-		arr = MergeArr(arr)
+		arr, addScore = MergeArr(arr)
+		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 1, #arr do 
 				BoardData[k][i] = arr[k]
@@ -124,21 +131,24 @@ function Board.OnLeft()
 			move = true 
 		end	
 	end
-	return move
+	return move, mergeScore
 end 
 
 function Board.OnRight()
 	local move = false
+	local mergeScore = 0
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
+		local addScore = 0
 		for j = 4, 1, -1 do
 			if BoardData[j][i] > 0 then
 				table.insert(arr, BoardData[j][i])
 			end	
 			table.insert(oldArr, BoardData[j][i])
 		end
-		arr = MergeArr(arr)
+		arr, addScore = MergeArr(arr)
+		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 4, 4-#arr+1, -1 do 
 				BoardData[k][i] = arr[4-k+1]
@@ -158,21 +168,24 @@ function Board.OnRight()
 			move = true 
 		end	
 	end
-	return move
+	return move, mergeScore
 end 
 
 function Board.OnUp()
 	local move = false
+	local mergeScore = 0
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
+		local addScore = 0
 		for j = 4, 1, -1 do
 			if BoardData[i][j] > 0 then
 				table.insert(arr, BoardData[i][j])
 			end	
 			table.insert(oldArr, BoardData[i][j])
 		end
-		arr = MergeArr(arr)
+		arr, addScore = MergeArr(arr)
+		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 4, 4-#arr+1, -1 do 
 				BoardData[i][k] = arr[4-k+1]
@@ -192,21 +205,24 @@ function Board.OnUp()
 			move = true 
 		end	
 	end
-	return move
+	return move, mergeScore
 end 
 
 function Board.OnDown()
 	local move = false
+	local mergeScore = 0
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
+		local addScore = 0
 		for j = 1, 4 do
 			if BoardData[i][j] > 0 then
 				table.insert(arr, BoardData[i][j])
 			end	
 			table.insert(oldArr, BoardData[i][j])
 		end
-		arr = MergeArr(arr)
+		arr, addScore = MergeArr(arr)
+		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 1, #arr do 
 				BoardData[i][k] = arr[k]
@@ -226,7 +242,7 @@ function Board.OnDown()
 			move = true 
 		end	
 	end
-	return move
+	return move, mergeScore
 end 
 
 function Board.GetNumCount()
