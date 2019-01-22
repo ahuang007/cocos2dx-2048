@@ -18,7 +18,6 @@ local ResetLayer
 
 local MaxScoreLabel
 local CurScoreLabel
-local OverLabel
 local soundBtn
 
 local rankFlag = false
@@ -93,9 +92,6 @@ function MainScene:DrawBoard()
 end
 
 function MainScene:ResetBoard()
-	if OverLabel then 
-		OverLabel:setString("")
-	end	
 	Board.InitBoardData()
 	CurScore = 0 
 	self:AfterOperate(2, true)
@@ -125,6 +121,10 @@ local function GetRankList()
 				if v.uid == UserProfile.uid then 
 					myrank = v.rank
 					MyRankLabel:setString(tostring(myrank))
+					if v.score > MaxScore then 
+						MaxScore = v.score
+						MaxScoreLabel:setString(MaxScore)
+					end
 				end
 			end
 		end 
@@ -137,7 +137,7 @@ local function CommitData2RankServer(score)
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
 	local url = string.format('http://%s:%d/CommitData?appid=1&data={"uid":%d,"name":"%s","headIcon":"%s","score":%d}', GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid, UserProfile.name, UserProfile.headIcon, score)
-	print("CommitData2RankServer usrl ", url)
+	print("CommitData2RankServer url ", url)
 	xhr:open("GET", url)
 	local function onResponse()
 		local str = xhr.response	--获得返回数据
@@ -145,8 +145,7 @@ local function CommitData2RankServer(score)
 		local data = json.decode(str)
 		if data.status == 0 then 
 			print("CommitData2RankServer ok!", score)
-			GetRankList()
-		end 
+		end
 	end
 	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
 	xhr:send()	--发送
@@ -172,9 +171,14 @@ function MainScene:AfterOperate(num, move)
 		scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.3) -- 定时器:只执行一次
 	else 
 		if Board.isBoardEnd() then -- 重置确认弹框
+			if CurScore >= MaxScore then 
+				CommitData2RankServer(MaxScore)
+				GetRankList()
+			end	
+
 			if not ResetLayer then 	
 				ResetLayer = cc.CSLoader:createNode("Reset.csb")
-				ResetLayer:move(display.height/2 - 250, display.height/2 - 250)
+				ResetLayer:move(display.width/2 - 250, display.height/2 - 250)
 				ResetLayer:addTo(self, 200)
 			else 	
 				ResetLayer:setVisible(true)
@@ -386,16 +390,16 @@ local function LoginCommit2AccountServer(account, password)
 			print("Login ok!", account, data.session)
 			UserProfile.uid = data.uid
 			UserProfile.name = account
-			if not Storage.getString("account") then 
+			if Storage.getString("account", "") == "" then 
 				Storage.setString("account", account)
 			end 
-			if not Storage.getString("password") then 
+			if Storage.getString("password", "") == "" then
 				Storage.setString("password", password)
 			end
 			LoginScene:setVisible(false)
-			GetRankList()
 			BoardLayer:setVisible(true)
 			ScoreLayer:setVisible(true)
+			GetRankList()
 		end
 	end
 	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
@@ -421,6 +425,13 @@ local function RegCommit2AccountServer(account, password)
 			LoginScene:getChildByName("TextField_password"):setString(password)
 			RegScene:setVisible(false)
 			LoginScene:setVisible(true)
+
+			-- 新玩家注册 重置所有数据
+			MaxScore = 0
+			CurScore = 0
+			MaxScoreLabel:setString(MaxScore)
+			CurScoreLabel:setString(CurScore)
+			MainScene:ResetBoard()
 		end
 	end
 	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
@@ -515,7 +526,7 @@ function MainScene:onCreate()
 				rankFlag = true 
 			
 				if not rankLayer then 
-					local color = cc.c4b(255, 0, 255, 255)
+					local color = cc.c4b(112, 146, 190, 255)
 					rankLayer = cc.LayerColor:create(color)
 					rankLayer:setContentSize(cc.size(display.height, display.height))
 					rankLayer:setPosition(cc.p(0, 0))
