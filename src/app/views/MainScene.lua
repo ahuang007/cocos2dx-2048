@@ -15,10 +15,10 @@ local RegScene
 local BoardLayer 
 local ScoreLayer
 local ResetLayer
+local SettingLayer
 
 local MaxScoreLabel
 local CurScoreLabel
-local soundBtn
 
 local rankFlag = false
 local rankLayer
@@ -26,6 +26,7 @@ local ranklist = {}
 local myrank = 0
 local MyRankLabel
 local MusicFlag = true
+local EffectFlag = true
 local SettingFlag = false
 
 local rectLen = display.height/4 -- 单元格长度
@@ -33,7 +34,6 @@ local Num2Color = GameConfig.Num2Color -- 数字颜色
 local MaxScore = 0 -- 历史最高分
 local CurScore = 0 -- 当前分数 
 local NumLabels = {} -- 数字组件
-
 
 local function createNum(idx, idy)
 	local cx = (idx-1)*rectLen +rectLen/2 
@@ -123,8 +123,8 @@ local function GetRankList()
 					MyRankLabel:setString(tostring(myrank))
 					if v.score > MaxScore then 
 						MaxScore = v.score
-						MaxScoreLabel:setString(MaxScore)
-					end
+						MaxScoreLabel:setString(tostring(MaxScore))
+					end	
 				end
 			end
 		end 
@@ -172,6 +172,7 @@ function MainScene:AfterOperate(num, move)
 	else 
 		if Board.isBoardEnd() then -- 重置确认弹框
 			if CurScore >= MaxScore then 
+				MaxScore = CurScore
 				CommitData2RankServer(MaxScore)
 				GetRankList()
 			end	
@@ -196,17 +197,28 @@ function MainScene:AfterOperate(num, move)
 end
 
 local function SetMusicSwitch(flag)
-	GameMusic.setEffectSwitch(flag)
 	GameMusic.setMusicSwitch(flag)
+	local MusicBtn = SettingLayer:getChildByName("btn_music")
 	if flag then 
-		soundBtn:loadTextures("sound.png", "sound.png")
+		MusicBtn:loadTextures("btn_on.png", "btn_on.png")
 		GameMusic.resumeMusic()	
 	else 
-		soundBtn:loadTextures("sound_off.png", "sound_off.png")
+		MusicBtn:loadTextures("btn_off.png", "btn_off.png")
 		GameMusic.pauseMusic()	
 	end	
 	Storage.setBool("music", flag)
 end	
+
+local function SetEffectSwitch(flag)
+	GameMusic.setEffectSwitch(flag)
+	local EffectBtn = SettingLayer:getChildByName("btn_effect")
+	if flag then 
+		EffectBtn:loadTextures("btn_on.png", "btn_on.png")
+	else 
+		EffectBtn:loadTextures("btn_off.png", "btn_off.png")
+	end	
+	Storage.setBool("effect", flag)
+end
 
 function MainScene:LoadUserData()
 	local account =	Storage.getString("account")
@@ -229,7 +241,9 @@ function MainScene:LoadUserData()
 	CurScore = Storage.getInt("curScore", 0) -- 当前分数 取本地分数
 	Board.SetBoardData(Storage.getTable("boarddata"))
 	MusicFlag = Storage.getBool("music", true) -- 首次打开是开启的
+	EffectFlag = Storage.getBool("effect", true) -- 首次打开是开启的
 	SetMusicSwitch(MusicFlag)
+	SetEffectSwitch(EffectFlag)
 end
 
 function MainScene:RefreshScoreLayer()
@@ -388,17 +402,32 @@ local function LoginCommit2AccountServer(account, password)
 		local data = json.decode(str)
 		if data.status == 0 then 
 			print("Login ok!", account, data.session)
-			UserProfile.uid = data.uid
-			UserProfile.name = account
-			if Storage.getString("account", "") == "" then 
-				Storage.setString("account", account)
-			end 
-			if Storage.getString("password", "") == "" then
-				Storage.setString("password", password)
+			if not UserProfile.uid then -- 打开游戏后首次登陆
+				UserProfile.uid = data.uid
+				UserProfile.name = account
+				LoginScene:setVisible(false)
+				BoardLayer:setVisible(true)
+				ScoreLayer:setVisible(true)
+			elseif UserProfile.uid == data.uid then -- 登陆旧账号
+				LoginScene:setVisible(false)
+				BoardLayer:setVisible(true)
+				ScoreLayer:setVisible(true)
+			elseif UserProfile.uid ~= data.uid then -- 登陆新账号
+				UserProfile.uid = data.uid
+				UserProfile.name = account
+				MaxScore = 0 
+				CurScore = 0
+				if Storage.getString("account", "") == "" then 
+					Storage.setString("account", account)
+				end 
+				if Storage.getString("password", "") == "" then
+					Storage.setString("password", password)
+				end
+				LoginScene:setVisible(false)
+				BoardLayer:setVisible(true)
+				ScoreLayer:setVisible(true)
+				MainScene:ResetBoard()
 			end
-			LoginScene:setVisible(false)
-			BoardLayer:setVisible(true)
-			ScoreLayer:setVisible(true)
 			GetRankList()
 		end
 	end
@@ -452,6 +481,11 @@ function MainScene:onCreate()
 	LoginScene:setVisible(false)
 	LoginScene:move(0,0)
 	LoginScene:addTo(self, 110)
+
+	SettingLayer = cc.CSLoader:createNode("Setting.csb")
+	SettingLayer:setVisible(false)
+	SettingLayer:move(display.width/2 - 320, display.height/2 - 150)
+	SettingLayer:addTo(self, 120)
 
 	local regBtn = HomeScene:getChildByName("btn_reg")
 	regBtn:addTouchEventListener(function(sender,eventType)
@@ -509,6 +543,7 @@ function MainScene:onCreate()
 		end
 	end)
 	
+	-- [[
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
@@ -516,7 +551,7 @@ function MainScene:onCreate()
 		end
     end)
 	resetBtn:setPosition(display.width - 35, display.height - 105)
-	resetBtn:setVisible(false)
+	resetBtn:setVisible(true)
 	resetBtn:addTo(self, 10)
 	
 	local rankBtn = ccui.Button:create("rank_open.png", "rank_open.png", "rank_open.png")
@@ -581,42 +616,67 @@ function MainScene:onCreate()
 		end
     end)
 	rankBtn:setPosition(display.width - 35, display.height - 175)
-	rankBtn:setVisible(false)
+	rankBtn:setVisible(true)
 	rankBtn:addTo(self, 10)
-	
-	soundBtn = ccui.Button:create("sound.png", "sound_off.png", "sound.png")
-	soundBtn:addTouchEventListener(function(sender,eventType)
-		if eventType == ccui.TouchEventType.ended then
-			if MusicFlag then 
-				MusicFlag = false 				
-			else
-				MusicFlag = true 
-			end 
-			SetMusicSwitch(MusicFlag)
-		end
-    end)
-	soundBtn:setPosition(display.width - 35, display.height - 245)
-	soundBtn:setVisible(false)
-	soundBtn:addTo(self, 10)
+	--]]
 
-	local settingBtn = ccui.Button:create("btn_setting.png", "btn_setting.png", "btn_setting.png")
+	local settingBtn = ccui.Button:create("btn_setting.png")
 	settingBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
-			if not SettingFlag then 
-				SettingFlag = true
-				resetBtn:setVisible(true)
-				rankBtn:setVisible(true)
-				soundBtn:setVisible(true)
-			else 
-				SettingFlag = false	
-				resetBtn:setVisible(false)
-				rankBtn:setVisible(false)
-				soundBtn:setVisible(false)
-			end
+			if not SettingLayer:isVisible() then -- 设置面板可见 则不可点击设置按钮
+				if not SettingFlag then 
+					SettingFlag = true
+					SettingLayer:setVisible(true)
+				else 
+					SettingFlag = false	
+					SettingLayer:setVisible(false)
+				end
+			end 		
 		end
     end)
 	settingBtn:setPosition(display.width - 35, display.height - 35)
 	settingBtn:addTo(self, 10)
+
+	local SettingBtn_Close = SettingLayer:getChildByName("btn_close")
+	SettingBtn_Close:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			SettingLayer:setVisible(false)
+			SettingFlag = false
+		end
+	end)
+
+	local musicBtn = SettingLayer:getChildByName("btn_music")
+	musicBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			if not MusicFlag then 
+				MusicFlag = true 
+			else
+				MusicFlag = false
+			end
+			SetMusicSwitch(MusicFlag)
+		end
+    end)
+
+	local effectBtn = SettingLayer:getChildByName("btn_effect")
+	effectBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			if not EffectFlag then 
+				EffectFlag = true 
+			else
+				EffectFlag = false
+			end
+			SetEffectSwitch(EffectFlag)
+		end
+	end)
+	
+	local accountBtn = SettingLayer:getChildByName("btn_account")
+	accountBtn:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			SettingLayer:setVisible(false)
+			SettingFlag = false
+			HomeScene:setVisible(true)
+		end
+	end)
 	
 	self:LoadUserData()
 	self:InitBoard()
