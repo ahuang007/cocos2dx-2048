@@ -14,8 +14,8 @@ local LoginScene
 local RegScene
 local BoardLayer 
 local ScoreLayer
-local ResetLayer
 local SettingLayer
+local TipsLayer
 
 local MaxScoreLabel
 local CurScoreLabel
@@ -38,7 +38,7 @@ local NumLabels = {} -- 数字组件
 local function createNum(idx, idy)
 	local cx = (idx-1)*rectLen +rectLen/2 
 	local cy = (idy-1)*rectLen +rectLen/2 
-	local label = cc.Label:createWithSystemFont("", "Arial", 40)
+	local label = cc.Label:createWithSystemFont("", "Arial", 60)
 	label:move(cx, cy)
 	label:addTo(BoardLayer) 	
 	return label
@@ -46,7 +46,8 @@ end
 
 local function createLine(x1, y1, x2, y2)	
 	local draw = cc.DrawNode:create()
-	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 4, cc.c4f(1,1,0,1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
+	-- rgba: (210, 180, 152, 255)
+	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 4, cc.c4f(0.82, 0.7, 0.6, 1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
 	BoardLayer:addChild(draw, 1)
 end
 
@@ -82,19 +83,13 @@ function MainScene:DrawBoard()
 				else 
 					rgbArr = Num2Color[num]
 				end
-				numLabel:setColor(cc.c4b(rgbArr[1], rgbArr[2], rgbArr[3], 100))
+				numLabel:setColor(cc.c4b(rgbArr[1], rgbArr[2], rgbArr[3], 255))
 				numLabel:setString(tonumber(num))
 			else 
 				numLabel:setString("")
 			end
 		end
 	end	
-end
-
-function MainScene:ResetBoard()
-	Board.InitBoardData()
-	CurScore = 0 
-	self:AfterOperate(2, true)
 end
 
 function MainScene:AddNum(num)
@@ -133,7 +128,8 @@ local function GetRankList()
 	xhr:send()	--发送 
 end 
 
-local function CommitData2RankServer(score)
+-- exitFlag: true 退出游戏 false 不退出游戏 
+local function CommitData2RankServer(score, exitFlag)
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
 	local url = string.format('http://%s:%d/CommitData?appid=1&data={"uid":%d,"name":"%s","headIcon":"%s","score":%d}', GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid, UserProfile.name, UserProfile.headIcon, score)
@@ -146,21 +142,42 @@ local function CommitData2RankServer(score)
 		if data.status == 0 then 
 			print("CommitData2RankServer ok!", score)
 		end
+		if exitFlag then
+			cc.Director:getInstance():endToLua() -- 为了让排行榜正常提交 在此结束游戏进程【因为网络进程和游戏进程不在同一个进程】
+		end	
 	end
 	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
 	xhr:send()	--发送
 end 
 
-local function saveBoardData()
-	Storage.setTable("boarddata", Board.GetBoardData())
-	if CurScore >= MaxScore then 
+function MainScene:ResetBoard()
+	if CurScore >= MaxScore and CurScore > 0 then 
 		MaxScore = CurScore
-		if UserProfile.uid then 
-			CommitData2RankServer(MaxScore)
-		end 	
-	end	
-	Storage.setInt("maxScore", MaxScore)
-	Storage.setInt("curScore", CurScore)
+		CommitData2RankServer(MaxScore)
+	end
+	Board.InitBoardData()
+	CurScore = 0
+	self:AfterOperate(2, true)
+end
+
+local function ExitGame()
+	TipsLayer:getChildByName("Text_tips"):setString("确定要离开游戏么")
+	TipsLayer:setVisible(true)
+	local btnYes = TipsLayer:getChildByName("btn_yes")
+	btnYes:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			TipsLayer:setVisible(false)
+			Storage.setTable("boarddata", Board.GetBoardData())	
+			Storage.setInt("maxScore", MaxScore)
+			Storage.setInt("curScore", CurScore)
+			if CurScore >= MaxScore and UserProfile.uid then 
+				MaxScore = CurScore
+				CommitData2RankServer(MaxScore, true) -- todo: 设置超时时间 如果不能提交也要退出游戏
+			else
+				cc.Director:getInstance():endToLua()
+			end	
+		end
+	end)
 end
 
 function MainScene:AfterOperate(num, move)
@@ -174,22 +191,17 @@ function MainScene:AfterOperate(num, move)
 			if CurScore >= MaxScore then 
 				MaxScore = CurScore
 				CommitData2RankServer(MaxScore)
-				GetRankList()
+				GetRankList() -- todo: 排行榜数据刷新
 			end	
 
-			if not ResetLayer then 	
-				ResetLayer = cc.CSLoader:createNode("Reset.csb")
-				ResetLayer:move(display.width/2 - 250, display.height/2 - 250)
-				ResetLayer:addTo(self, 200)
-			else 	
-				ResetLayer:setVisible(true)
-			end	
+			TipsLayer:getChildByName("Text_tips"):setString("GAME OVER\n 重新开始")
+			TipsLayer:setVisible(true)
 
-			local startBtn = ResetLayer:getChildByName("btn_start")
-			startBtn:addTouchEventListener(function(sender,eventType)
+			local resetBtn = TipsLayer:getChildByName("btn_yes")
+			resetBtn:addTouchEventListener(function(sender,eventType)
 				if eventType == ccui.TouchEventType.ended then
 					self:ResetBoard()
-					ResetLayer:setVisible(false)
+					TipsLayer:setVisible(false)
 				end
 			end)
 		end
@@ -257,21 +269,21 @@ end
 
 local function InitScoreLayer()
 	local MaxStaticLabel = cc.Label:createWithSystemFont("历史纪录", "Arial", 35)
-	MaxStaticLabel:move((display.width - display.height)/2, display.height - 1*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MaxStaticLabel:move((display.width - display.height)/2, display.height - 0.6*rectLen) -- 此处是相对scoreLayer左下角的位置
 	MaxStaticLabel:addTo(ScoreLayer) 	
 	
 	MaxScoreLabel = ccui.TextBMFont:create()
-    MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.5*rectLen)
+    MaxScoreLabel:move((display.width - display.height)/2, display.height - 1.2*rectLen)
     MaxScoreLabel:addTo(ScoreLayer)
 	MaxScoreLabel:setFntFile("font_number.fnt")
 	MaxScoreLabel:setString(tostring(MaxScore))
 
 	local CurStaticLabel = cc.Label:createWithSystemFont("当前分数", "Arial", 35)
-	CurStaticLabel:move((display.width - display.height)/2, display.height - 2*rectLen) -- 此处是相对scoreLayer左下角的位置
+	CurStaticLabel:move((display.width - display.height)/2, display.height - 1.8*rectLen) -- 此处是相对scoreLayer左下角的位置
 	CurStaticLabel:addTo(ScoreLayer) 	
 
 	CurScoreLabel = ccui.TextBMFont:create()
-    CurScoreLabel:move((display.width - display.height)/2, display.height - 2.5*rectLen)
+    CurScoreLabel:move((display.width - display.height)/2, display.height - 2.4*rectLen)
     CurScoreLabel:addTo(ScoreLayer)
 	CurScoreLabel:setFntFile("font_number.fnt")
 	CurScoreLabel:setString(tostring(CurScore))
@@ -281,7 +293,7 @@ local function InitScoreLayer()
 	MyRankStaticLable:addTo(ScoreLayer) 
 	
 	MyRankLabel = ccui.TextBMFont:create()
-    MyRankLabel:move((display.width - display.height)/2, display.height - 3.5*rectLen)
+    MyRankLabel:move((display.width - display.height)/2, display.height - 3.6*rectLen)
     MyRankLabel:addTo(ScoreLayer)
 	MyRankLabel:setFntFile("font_number.fnt")
 	MyRankLabel:setString(tostring(0))
@@ -379,14 +391,10 @@ function MainScene:onTouchCancelled(touch, event)
 end
 
 local function onRelease(keyCode, event)
-	if keyCode == cc.KeyCode.KEY_BACK then	
-		saveBoardData()
-		cc.Director:getInstance():endToLua()
-	elseif keyCode == cc.KeyCode.KEY_HOME or keyCode == cc.KeyCode.KEY_BACKSPACE then
-		saveBoardData()
-	elseif keyCode == cc.KeyCode.KEY_Q then
-		saveBoardData()
-		cc.Director:getInstance():endToLua()
+	if keyCode == cc.KeyCode.KEY_BACK or keyCode == cc.KeyCode.KEY_Q then	-- KEY_BACK android / KEY_Q windows
+		ExitGame()
+	elseif keyCode == cc.KeyCode.KEY_HOME then
+		-- ExitGame()
 	end
 end
 
@@ -402,6 +410,14 @@ local function LoginCommit2AccountServer(account, password)
 		local data = json.decode(str)
 		if data.status == 0 then 
 			print("Login ok!", account, data.session)
+
+			if Storage.getString("account", "") == "" then 
+				Storage.setString("account", account)
+			end 
+			if Storage.getString("password", "") == "" then
+				Storage.setString("password", password)
+			end
+
 			if not UserProfile.uid then -- 打开游戏后首次登陆
 				UserProfile.uid = data.uid
 				UserProfile.name = account
@@ -417,12 +433,6 @@ local function LoginCommit2AccountServer(account, password)
 				UserProfile.name = account
 				MaxScore = 0 
 				CurScore = 0
-				if Storage.getString("account", "") == "" then 
-					Storage.setString("account", account)
-				end 
-				if Storage.getString("password", "") == "" then
-					Storage.setString("password", password)
-				end
 				LoginScene:setVisible(false)
 				BoardLayer:setVisible(true)
 				ScoreLayer:setVisible(true)
@@ -486,6 +496,25 @@ function MainScene:onCreate()
 	SettingLayer:setVisible(false)
 	SettingLayer:move(display.width/2 - 320, display.height/2 - 150)
 	SettingLayer:addTo(self, 120)
+
+	TipsLayer = cc.CSLoader:createNode("Tips.csb")
+	TipsLayer:setVisible(false)
+	TipsLayer:move(display.width/2 - 320, display.height/2 - 150)
+	TipsLayer:addTo(self, 120)
+
+	local TipsBtn_Close = TipsLayer:getChildByName("btn_close")
+	TipsBtn_Close:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			TipsLayer:setVisible(false)
+		end
+	end)
+	
+	local TipsBtn_No = TipsLayer:getChildByName("btn_no")
+	TipsBtn_No:addTouchEventListener(function(sender,eventType)
+		if eventType == ccui.TouchEventType.ended then
+			TipsLayer:setVisible(false)
+		end
+	end)
 
 	local regBtn = HomeScene:getChildByName("btn_reg")
 	regBtn:addTouchEventListener(function(sender,eventType)
