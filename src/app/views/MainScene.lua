@@ -140,8 +140,7 @@ local function CommitData2RankServer(score, exitFlag)
 		print("CommitData2RankServer resp", str)
 		local data = json.decode(str)
 		if data.status == 0 then 
-			print("CommitData2RankServer ok!", score)
-		end
+ 		end
 		if exitFlag then
 			cc.Director:getInstance():endToLua() -- 为了让排行榜正常提交 在此结束游戏进程【因为网络进程和游戏进程不在同一个进程】
 		end	
@@ -300,14 +299,15 @@ local function InitScoreLayer()
 end
 
 function MainScene:InitBoard()
-	local color = cc.c4b(130, 36, 94, 255)
+	local color = cc.c4b(207, 198, 189, 255)
     BoardLayer = cc.LayerColor:create(color)
 	BoardLayer:setContentSize(cc.size(display.height, display.height))
 	BoardLayer:setPosition(cc.p(0, 0))
 	BoardLayer:setVisible(false)
 	self:addChild(BoardLayer, 1)
 	
-    ScoreLayer = cc.LayerColor:create(color)
+	local color1 = cc.c4b(130, 36, 94, 255)
+    ScoreLayer = cc.LayerColor:create(color1)
 	ScoreLayer:setContentSize(cc.size(display.width - display.height, display.height))
 	ScoreLayer:setPosition(cc.p(display.height, 0))
 	ScoreLayer:setVisible(false)
@@ -499,7 +499,7 @@ function MainScene:onCreate()
 
 	TipsLayer = cc.CSLoader:createNode("Tips.csb")
 	TipsLayer:setVisible(false)
-	TipsLayer:move(display.width/2 - 320, display.height/2 - 150)
+	TipsLayer:move(display.width/2 - 250, display.height/2 - 150)
 	TipsLayer:addTo(self, 120)
 
 	local TipsBtn_Close = TipsLayer:getChildByName("btn_close")
