@@ -55,7 +55,7 @@ end
 local function creatRect(idx, idy)
 	local rect = cc.DrawNode:create()
 	-- rgba: cc.c4b(207, 198, 189, 255)
-	rect:drawSolidRect(cc.p((idx-1)*rectLen, (idy-1)*rectLen), cc.p(idx*rectLen, idy*rectLen), cc.c4f(0.81, 0.776, 0.596, 1))
+	rect:drawSolidRect(cc.p((idx-1)*rectLen, (idy-1)*rectLen), cc.p(idx*rectLen, idy*rectLen), cc.c4f(0.81, 0.776, 0.74, 1))
 	BoardLayer:addChild(rect, 1) 
 	return rect
 end
@@ -103,20 +103,17 @@ function MainScene:DrawBoard()
 				else 
 					rgbArr = Num2Color[num]
 				end
-				--numLabel:setColor(cc.c4b(rgbArr[1], rgbArr[2], rgbArr[3], 255))
 				numLabel:setString(tonumber(num))
 				NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(rgbArr[1]/255, rgbArr[2]/255, rgbArr[3]/255, 1))
 
 				if num == 2 or num == 4 then 
-					--NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(0, 0, 0, 1))
 					numLabel:setColor(cc.c4b(0, 0, 0, 255))
 				else 
-					--NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(1, 1, 1, 1))
 					numLabel:setColor(cc.c4b(255, 255, 255, 255))
 				end 	 	
 			else 
 				numLabel:setString("")
-				NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(0.81, 0.776, 0.596, 1))
+				NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(0.81, 0.776, 0.74, 1))
 			end
 		end
 	end	
@@ -262,16 +259,16 @@ local function SetEffectSwitch(flag)
 end
 
 function MainScene:LoadUserData()
-	local account =	Storage.getString("account")
-	if account then 
+	local account =	Storage.getString("account", "")
+	if account ~= "" then 
 		UserProfile.name = account 
 	end 	
-	local password = Storage.getString("password")
-	if password then 
+	local password = Storage.getString("password", "")
+	if password ~= "" then 
 		UserProfile.password = password 
 	end 
 	
-	if account and password then 
+	if account ~= "" and password ~= "" then 
 		HomeScene:setVisible(false)
 		LoginScene:setVisible(true)
 		LoginScene:getChildByName("TextField_account"):setString(account)
@@ -411,7 +408,7 @@ function MainScene:onTouchEnded(touch, event)
 			local cx = (idx-1)*rectLen +rectLen/2 
 			local cy = (idy-1)*rectLen +rectLen/2 
 			particle:move(cx, cy)
-			BoardLayer:addChild(particle)
+			BoardLayer:addChild(particle, 5)
 			scheduler.performWithDelayGlobal(function() particle:removeFromParent() end, 1) -- 定时器:只执行一次
 
 			GameMusic.playEffect("merge_special.mp3")
