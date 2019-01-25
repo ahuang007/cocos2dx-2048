@@ -5,10 +5,10 @@ local Board = {}
 local BoardData
 
 local function MergeArr(arr)
-	local canMerge = false 
 	local score = 0
+	local mergeIndexs = {}
 	if #arr <= 1 then 
-		return arr, 0, canMerge 
+		return arr, 0, mergeIndexs 
 	elseif #arr >= 2 then 	
 		local markIndex = 0
 		local tmpArr = {}
@@ -16,8 +16,8 @@ local function MergeArr(arr)
 			if i >= markIndex then
 				if arr[i] == arr[i+1] then 
 					score = score + 2 * arr[i]
-					canMerge = true
 					table.insert(tmpArr, arr[i] + arr[i+1])
+					table.insert(mergeIndexs, #tmpArr)
 					markIndex = i+2
 				else
 					table.insert(tmpArr, arr[i]) 
@@ -25,26 +25,9 @@ local function MergeArr(arr)
 				end
 			end
 		end
-		return tmpArr,  score, canMerge
+		return tmpArr,  score, mergeIndexs
 	end	
 end
-
---[[ -- 分数计算规则改变 原来是面板总和相加 现在改成合并多少分数加多少 
-function Board.GetTotalScore(boarddata)
-	boarddata = boarddata or BoardData
-	if not boarddata then 
-		return 0 
-	end
-	
-	local totalScore = 0
-	for i = 1, 4 do 
-		for j = 1, 4 do 
-			totalScore = totalScore + BoardData[i][j]
-		end 
-	end 
-	return totalScore
-end
---]]
 
 function Board.GetMaxNum()
 	if not BoardData then return 0 end 
@@ -100,6 +83,8 @@ end
 function Board.OnLeft()
 	local move = false
 	local mergeScore = 0
+	local mergePos = {}
+	local mergeIndexs
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
@@ -110,11 +95,14 @@ function Board.OnLeft()
 			end	
 			table.insert(oldArr, BoardData[j][i])
 		end
-		arr, addScore = MergeArr(arr)
+		arr, addScore, mergeIndexs = MergeArr(arr)
 		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 1, #arr do 
 				BoardData[k][i] = arr[k]
+				if utils.elem(mergeIndexs, k) then 
+					table.insert(mergePos, {k, i})
+				end 	
 			end
 
 			for k = #arr+1, 4 do 
@@ -131,12 +119,14 @@ function Board.OnLeft()
 			move = true 
 		end	
 	end
-	return move, mergeScore
+	return move, mergeScore, mergePos
 end 
 
 function Board.OnRight()
 	local move = false
 	local mergeScore = 0
+	local mergePos = {}
+	local mergeIndexs
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
@@ -147,11 +137,14 @@ function Board.OnRight()
 			end	
 			table.insert(oldArr, BoardData[j][i])
 		end
-		arr, addScore = MergeArr(arr)
+		arr, addScore, mergeIndexs = MergeArr(arr)
 		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 4, 4-#arr+1, -1 do 
 				BoardData[k][i] = arr[4-k+1]
+				if utils.elem(mergeIndexs, 4-k+1) then 
+					table.insert(mergePos, {k, i})
+				end
 			end
 
 			for k = 4-#arr, 1, -1 do 
@@ -168,12 +161,14 @@ function Board.OnRight()
 			move = true 
 		end	
 	end
-	return move, mergeScore
+	return move, mergeScore, mergePos
 end 
 
 function Board.OnUp()
 	local move = false
 	local mergeScore = 0
+	local mergePos = {}
+	local mergeIndexs
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
@@ -184,11 +179,14 @@ function Board.OnUp()
 			end	
 			table.insert(oldArr, BoardData[i][j])
 		end
-		arr, addScore = MergeArr(arr)
+		arr, addScore, mergeIndexs = MergeArr(arr)
 		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 4, 4-#arr+1, -1 do 
 				BoardData[i][k] = arr[4-k+1]
+				if utils.elem(mergeIndexs, 4-k+1) then 
+					table.insert(mergePos, {i, k})
+				end
 			end
 
 			for k = 4-#arr, 1, -1 do 
@@ -205,12 +203,14 @@ function Board.OnUp()
 			move = true 
 		end	
 	end
-	return move, mergeScore
+	return move, mergeScore, mergePos
 end 
 
 function Board.OnDown()
 	local move = false
 	local mergeScore = 0
+	local mergePos = {}
+	local mergeIndexs
 	for i = 1, 4 do
 		local oldArr = {}
 		local arr = {}
@@ -221,11 +221,14 @@ function Board.OnDown()
 			end	
 			table.insert(oldArr, BoardData[i][j])
 		end
-		arr, addScore = MergeArr(arr)
+		arr, addScore, mergeIndexs = MergeArr(arr)
 		mergeScore = mergeScore + addScore
 		if #arr > 0 then 
 			for k = 1, #arr do 
 				BoardData[i][k] = arr[k]
+				if utils.elem(mergeIndexs, k) then 
+					table.insert(mergePos, {i, k})
+				end
 			end
 
 			for k = #arr+1, 4 do 
@@ -242,7 +245,7 @@ function Board.OnDown()
 			move = true 
 		end	
 	end
-	return move, mergeScore
+	return move, mergeScore, mergePos
 end 
 
 function Board.GetNumCount()

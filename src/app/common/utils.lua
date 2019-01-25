@@ -65,4 +65,14 @@ function utils.split(str, split)
     return list
 end
 
+function utils.elem(arr, e)
+    local exist = false
+    for i, v in ipairs(arr) do 
+        if v == e then 
+            exist = true 
+        end     
+    end     
+    return exist
+end    
+
 return utils

@@ -34,36 +34,55 @@ local Num2Color = GameConfig.Num2Color -- 数字颜色
 local MaxScore = 0 -- 历史最高分
 local CurScore = 0 -- 当前分数 
 local NumLabels = {} -- 数字组件
+local NumBgRects = {} -- 数字背景色矩形框
 
 local function createNum(idx, idy)
 	local cx = (idx-1)*rectLen +rectLen/2 
 	local cy = (idy-1)*rectLen +rectLen/2 
 	local label = cc.Label:createWithSystemFont("", "Arial", 60)
 	label:move(cx, cy)
-	label:addTo(BoardLayer) 	
+	label:addTo(BoardLayer, 2) 	
 	return label
 end
 
-local function createLine(x1, y1, x2, y2)	
-	local draw = cc.DrawNode:create()
-	-- rgba: (210, 180, 152, 255)
-	draw:drawSegment(cc.p(x1, y1), cc.p(x2,y2), 4, cc.c4f(0.82, 0.7, 0.6, 1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
-	BoardLayer:addChild(draw, 1)
+local function createLine(x1, y1, x2, y2, linewidth)	
+	local line = cc.DrawNode:create()
+	-- rgba: cc.c4b(210, 180, 152, 255)
+	line:drawSegment(cc.p(x1, y1), cc.p(x2,y2), linewidth, cc.c4f(0.82, 0.7, 0.6, 1)) --  ('起点' , '终点' , '半线宽' , '填充颜色')
+	BoardLayer:addChild(line, 3)
+end
+
+local function creatRect(idx, idy)
+	local rect = cc.DrawNode:create()
+	-- rgba: cc.c4b(207, 198, 189, 255)
+	rect:drawSolidRect(cc.p((idx-1)*rectLen, (idy-1)*rectLen), cc.p(idx*rectLen, idy*rectLen), cc.c4f(0.81, 0.776, 0.596, 1))
+	BoardLayer:addChild(rect, 1) 
+	return rect
 end
 
 local function InitNumLabels()
 	for i = 1, 5 do -- 5竖
-		createLine((i-1)*rectLen, 0, (i-1)*rectLen, display.height)
+		local linewidth = 4
+		if i == 1 or i == 5 then 
+			linewidth = 8
+		end
+		createLine((i-1)*rectLen, 0, (i-1)*rectLen, display.height, linewidth)
 	end
 	
 	for j = 1, 5 do -- 5横
-		createLine(0, (j-1)*rectLen, display.height, (j-1)*rectLen)
+		local linewidth = 4
+		if j == 1 or j == 5 then 
+			linewidth = 8
+		end
+		createLine(0, (j-1)*rectLen, display.height, (j-1)*rectLen, linewidth)
 	end
 
 	for i = 1, 4 do 
 		NumLabels[i] = {}
+		NumBgRects[i] = {}
 		for j = 1, 4 do
 			NumLabels[i][j] = createNum(i, j)
+			NumBgRects[i][j] = creatRect(i, j)	
 		end
 	end
 end	
@@ -74,6 +93,7 @@ function MainScene:DrawBoard()
 	
 	for i = 1, 4 do 
 		for j = 1, 4 do 
+			NumBgRects[i][j]:clear()
 			local num = boarddata[i][j]
 			local numLabel = NumLabels[i][j]
 			if num > 0 then 
@@ -83,10 +103,20 @@ function MainScene:DrawBoard()
 				else 
 					rgbArr = Num2Color[num]
 				end
-				numLabel:setColor(cc.c4b(rgbArr[1], rgbArr[2], rgbArr[3], 255))
+				--numLabel:setColor(cc.c4b(rgbArr[1], rgbArr[2], rgbArr[3], 255))
 				numLabel:setString(tonumber(num))
+				NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(rgbArr[1]/255, rgbArr[2]/255, rgbArr[3]/255, 1))
+
+				if num == 2 or num == 4 then 
+					--NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(0, 0, 0, 1))
+					numLabel:setColor(cc.c4b(0, 0, 0, 255))
+				else 
+					--NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(1, 1, 1, 1))
+					numLabel:setColor(cc.c4b(255, 255, 255, 255))
+				end 	 	
 			else 
 				numLabel:setString("")
+				NumBgRects[i][j]:drawSolidRect(cc.p((i-1)*rectLen, (j-1)*rectLen), cc.p(i*rectLen, j*rectLen), cc.c4f(0.81, 0.776, 0.596, 1))
 			end
 		end
 	end	
@@ -299,7 +329,7 @@ local function InitScoreLayer()
 end
 
 function MainScene:InitBoard()
-	local color = cc.c4b(207, 198, 189, 255)
+	local color = cc.c4b(207, 198, 189, 0)
     BoardLayer = cc.LayerColor:create(color)
 	BoardLayer:setContentSize(cc.size(display.height, display.height))
 	BoardLayer:setPosition(cc.p(0, 0))
@@ -348,29 +378,36 @@ function MainScene:onTouchEnded(touch, event)
 	local flag = false -- 滑动后发现有合并的 则新增数字
 	local mergeScore = 0
 	local beforeMaxNum = Board.GetMaxNum()
+	local mergePos = {} -- 合并数字的位置
 	if math.abs(endX) > math.abs(endY) then 
 		if math.abs(endX) > 5 then -- 滑动太少不算
 			if endX > 0 then 
-				 flag, mergeScore = Board.OnLeft()
+				 flag, mergeScore, mergePos = Board.OnLeft()
 			else 
-				flag, mergeScore = Board.OnRight()
+				flag, mergeScore, mergePos = Board.OnRight()
 			end
 		end		
 	else 
 		if math.abs(endY) > 5 then -- 滑动太少不算
 			if endY > 0 then 
-				flag, mergeScore = Board.OnDown()
+				flag, mergeScore, mergePos = Board.OnDown()
 			else 
-				flag, mergeScore = Board.OnUp()
+				flag, mergeScore, mergePos = Board.OnUp()
 			end	
 		end	
 	end
 	
 	if flag then 
+		for i, v in ipairs(mergePos) do 
+			local label = NumLabels[v[1]][v[2]]
+			local action1 = cc.ScaleTo:create(0.3,1.5)
+			local action2 = cc.ScaleTo:create(0.3,1)
+			label:runAction(cc.Sequence:create(action1,action2))  -- 先放大再缩小
+		end 	
+
 		local afterMaxNum, idx, idy = Board.GetMaxNum() 
 		if afterMaxNum > beforeMaxNum and afterMaxNum >= 4 then 
-			--local particle = cc.ParticleSystemQuad:create("defaultParticle.plist") --自定义粒子效果
-			local particle = cc.ParticleExplosion:create() -- 默认粒子效果
+			local particle = cc.ParticleExplosion:create() -- 爆炸粒子效果
 			local cx = (idx-1)*rectLen +rectLen/2 
 			local cy = (idy-1)*rectLen +rectLen/2 
 			particle:move(cx, cy)
