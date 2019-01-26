@@ -23,6 +23,8 @@ local CurScoreLabel
 local rankFlag = false
 local rankLayer
 local ranklist = {}
+local rankItems = {} -- 排行榜列表控件
+local rankLayouts = {}
 local myrank = 0
 local MyRankLabel
 local MusicFlag = true
@@ -126,10 +128,52 @@ function MainScene:AddNum(num)
 	end
 end
 
-local function GetRankList()
+local function showRankList(startindex, endIndex)
+	assert(startindex < endIndex, "startindex over endindex")
+	for i = startindex, endIndex do
+		local userdata = ranklist[i]
+		if userdata then 
+			local index = i%50 == 0 and 50 or i%50
+			local layout = rankLayouts[index]
+			if userdata.uid == UserProfile.uid then 
+				layout:setBackGroundColor(cc.c3b(0, 0, 0))
+			else
+				layout:setBackGroundColor(cc.c3b(181, 230, 29))
+			end 
+
+			for j = 1, 4 do 
+				local label = rankItems[i][j]
+				local color = cc.c4b(255, 255, 255, 255)
+				if i == 1 then 
+					color = cc.c4b(255, 0, 0, 255)
+				elseif i == 2 then 
+					color = cc.c4b(0, 255, 0, 255)
+				elseif i == 3 then 
+					color = cc.c4b(0, 0, 255, 255)
+				end 	
+				label:setColor(color)
+
+				if j == 1 then 
+					label:setString(tostring(i))
+				elseif j == 2 then 
+					label:setString(tostring(userdata.uid))
+				elseif j == 3 then 
+					label:setString(tostring(userdata.name))
+				elseif j == 4 then 
+					label:setString(tostring(userdata.score))
+				end 						
+			end	
+		end
+	end
+end 	
+
+local function GetRankList(startindex, endIndex)
+	startindex = startindex or 1 
+	endIndex = endIndex or 50
+
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
-	local url = string.format('http://%s:%d/GetRankList?appid=1&data={"uid":%d,"startindex":%d,"endindex":%d}', GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid or 0, 1, 10)
+	local url = string.format('http://%s:%d/GetRankList?appid=1&data={"uid":%d,"startindex":%d,"endindex":%d}', GameConfig.RankSrvIp, GameConfig.RankSrvPort, UserProfile.uid or 0, startindex, endIndex)
 	print("GetRankList url ", url)
 	xhr:open("GET", url)
 	local function onResponse()
@@ -137,8 +181,8 @@ local function GetRankList()
 		print("GetRankList resp", str)
 		local data = json.decode(str)
 		if data.status == 0 then 
-			ranklist = data.lists
-			for i, v in ipairs(ranklist) do 
+			for i, v in ipairs(data.lists) do 
+				ranklist[v.rank] = v
 				print("ranlist ", v.uid, v.rank, v.name, v.score)
 				if v.uid == UserProfile.uid then 
 					myrank = v.rank
@@ -149,7 +193,9 @@ local function GetRankList()
 					end	
 				end
 			end
-		end 
+
+			showRankList(startindex, endIndex)
+		end
 	end
 	xhr:registerScriptHandler(onResponse)	--注册脚本方式回调
 	xhr:send()	--发送 
@@ -217,7 +263,7 @@ function MainScene:AfterOperate(num, move)
 			if CurScore >= MaxScore then 
 				MaxScore = CurScore
 				CommitData2RankServer(MaxScore)
-				GetRankList() -- todo: 排行榜数据刷新
+				GetRankList() -- 排行榜数据刷新
 			end	
 
 			TipsLayer:getChildByName("Text_tips"):setString("GAME OVER\n 重新开始")
@@ -295,7 +341,7 @@ end
 
 local function InitScoreLayer()
 	local MaxStaticLabel = cc.Label:createWithSystemFont("历史纪录", "Arial", 35)
-	MaxStaticLabel:move((display.width - display.height)/2, display.height - 0.6*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MaxStaticLabel:move((display.width - display.height)/2, display.height - 0.6*rectLen) 
 	MaxStaticLabel:addTo(ScoreLayer) 	
 	
 	MaxScoreLabel = ccui.TextBMFont:create()
@@ -305,7 +351,7 @@ local function InitScoreLayer()
 	MaxScoreLabel:setString(tostring(MaxScore))
 
 	local CurStaticLabel = cc.Label:createWithSystemFont("当前分数", "Arial", 35)
-	CurStaticLabel:move((display.width - display.height)/2, display.height - 1.8*rectLen) -- 此处是相对scoreLayer左下角的位置
+	CurStaticLabel:move((display.width - display.height)/2, display.height - 1.8*rectLen) 
 	CurStaticLabel:addTo(ScoreLayer) 	
 
 	CurScoreLabel = ccui.TextBMFont:create()
@@ -315,7 +361,7 @@ local function InitScoreLayer()
 	CurScoreLabel:setString(tostring(CurScore))
 	
 	local MyRankStaticLable = cc.Label:createWithSystemFont("我的排名", "Arial", 35)
-	MyRankStaticLable:move((display.width - display.height)/2, display.height - 3*rectLen) -- 此处是相对scoreLayer左下角的位置
+	MyRankStaticLable:move((display.width - display.height)/2, display.height - 3*rectLen) 
 	MyRankStaticLable:addTo(ScoreLayer) 
 	
 	MyRankLabel = ccui.TextBMFont:create()
@@ -536,6 +582,55 @@ function MainScene:onCreate()
 	TipsLayer:move(display.width/2 - 250, display.height/2 - 150)
 	TipsLayer:addTo(self, 120)
 
+	local color = cc.c4b(112, 146, 190, 255)
+	rankLayer = cc.LayerColor:create(color)
+	rankLayer:setContentSize(cc.size(display.height, display.height))
+	rankLayer:setPosition(cc.p(0, 0))
+	rankLayer:setVisible(false)
+	self:addChild(rankLayer, 10)
+	for j = 1, 4 do -- 排行榜表头
+		local label = cc.Label:createWithSystemFont("", "Arial", 25)
+		label:setContentSize(cc.size(display.height/4, display.height/11))
+		label:setPosition(cc.p((j-1)*(display.height/4) + display.height/8, 10*(display.height/11) + display.height/22))
+		rankLayer:addChild(label)
+	
+		if j == 1 then 
+			label:setString("排名")
+		elseif j == 2 then 
+			label:setString("ID")
+		elseif j == 3 then 
+			label:setString("昵称")
+		elseif j == 4 then 
+			label:setString("分数")
+		end 
+	end
+
+	-- 排行榜listview
+	local listView = ccui.ListView:create();
+	listView:setPosition(cc.p(0, 0));
+	listView:setContentSize(cc.size(720, 654));
+	listView:setDirection(cc.SCROLLVIEW_DIRECTION_VERTICAL);
+	listView:setBounceEnabled(true);
+	listView:setItemsMargin(4)
+	
+	for i = 1, 50 do
+		rankItems[i] = {}
+		local layout = ccui.Layout:create();
+		layout:setContentSize(cc.size(720, 62));
+		layout:setBackGroundColorType(ccui.LayoutBackGroundColorType.solid);
+		layout:setBackGroundColor(cc.c3b(181, 230, 29));
+		for j = 1, 4 do 
+			local label = cc.Label:createWithSystemFont("", "Arial", 25)
+			label:setContentSize(cc.size(180, 60))
+			label:setPosition(90 + (j-1)*180, 30)
+			layout:addChild(label)
+			rankItems[i][j] = label
+		end	
+		listView:pushBackCustomItem(layout);
+		rankLayouts[i] = layout
+	end
+	rankLayer:addChild(listView);
+
 	local TipsBtn_Close = TipsLayer:getChildByName("btn_close")
 	TipsBtn_Close:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
@@ -606,14 +701,13 @@ function MainScene:onCreate()
 		end
 	end)
 	
-	-- [[
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
 			self:ResetBoard()
 		end
     end)
-	resetBtn:setPosition(display.width - 35, display.height - 105)
+	resetBtn:setPosition(display.width - 60, display.height - 160)
 	resetBtn:setVisible(true)
 	resetBtn:addTo(self, 10)
 	
@@ -622,54 +716,7 @@ function MainScene:onCreate()
 		if eventType == ccui.TouchEventType.ended then
 			if not rankFlag then 
 				rankFlag = true 
-			
-				if not rankLayer then 
-					local color = cc.c4b(112, 146, 190, 255)
-					rankLayer = cc.LayerColor:create(color)
-					rankLayer:setContentSize(cc.size(display.height, display.height))
-					rankLayer:setPosition(cc.p(0, 0))
-					self:addChild(rankLayer, 10)
-					
-					for i = 1, 11 do
-						for j = 1, 4 do 
-							local label = cc.Label:createWithSystemFont("", "Arial", 25)
-							label:setContentSize(cc.size(display.height/4, display.height/11))
-							label:setPosition(cc.p((j-1)*(display.height/4) + display.height/8, (11-i)*(display.height/11) + display.height/22))
-							rankLayer:addChild(label)
-							
-							if i == 1 then
-								if j == 1 then 
-									label:setString("排名")
-								elseif j == 2 then 
-									label:setString("ID")
-								elseif j == 3 then 
-									label:setString("昵称")
-								elseif j == 4 then 
-									label:setString("分数")
-								end 
-							else
-								local userdata = ranklist[i-1]
-								if userdata.uid == UserProfile.uid then 
-									local color = cc.c4b(0, 0, 0, 255)
-									label:setColor(color)
-								end	
-
-								if j == 1 then 
-									label:setString(tostring(i-1))
-								elseif j == 2 then 
-									label:setString(tostring(userdata.uid))
-								elseif j == 3 then 
-									label:setString(tostring(userdata.name))
-								elseif j == 4 then 
-									label:setString(tostring(userdata.score))
-								end 							
-							end							
-						end
-					end
-				else
-					rankLayer:setVisible(true)
-				end 
-				
+				rankLayer:setVisible(true)
 				rankBtn:loadTextures("rank_close.png", "rank_close.png");
 			else
 				rankFlag = false 
@@ -678,10 +725,9 @@ function MainScene:onCreate()
 			end 
 		end
     end)
-	rankBtn:setPosition(display.width - 35, display.height - 175)
+	rankBtn:setPosition(display.width - 60, display.height - 260)
 	rankBtn:setVisible(true)
 	rankBtn:addTo(self, 10)
-	--]]
 
 	local settingBtn = ccui.Button:create("btn_setting.png")
 	settingBtn:addTouchEventListener(function(sender,eventType)
@@ -697,7 +743,7 @@ function MainScene:onCreate()
 			end 		
 		end
     end)
-	settingBtn:setPosition(display.width - 35, display.height - 35)
+	settingBtn:setPosition(display.width - 60, display.height - 60)
 	settingBtn:addTo(self, 10)
 
 	local SettingBtn_Close = SettingLayer:getChildByName("btn_close")
