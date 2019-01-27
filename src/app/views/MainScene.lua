@@ -124,7 +124,6 @@ end
 function MainScene:AddNum(num)
 	if Board.GetNumCount() < 16 then 
 		Board.GenNewNum(num)
-		self:DrawBoard()
 	end
 end
 
@@ -257,7 +256,8 @@ function MainScene:AfterOperate(num, move)
 		self:DrawBoard()
 		self:RefreshScoreLayer()
 		-- 新出来的数字 延迟0.5s显示
-		scheduler.performWithDelayGlobal(function() self:AddNum(num) end, 0.3) -- 定时器:只执行一次
+		self:AddNum(num)
+		scheduler.performWithDelayGlobal(function() self:DrawBoard() end, 0.3) -- 定时器:只执行一次
 	else 
 		if Board.isBoardEnd() then -- 重置确认弹框
 			if CurScore >= MaxScore then 
