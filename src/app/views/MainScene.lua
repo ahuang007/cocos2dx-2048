@@ -146,7 +146,7 @@ local function showRankList(startindex, endIndex)
 				if i == 1 then 
 					color = cc.c4b(255, 0, 0, 255)
 				elseif i == 2 then 
-					color = cc.c4b(0, 255, 0, 255)
+					color = cc.c4b(255, 255, 0, 255)
 				elseif i == 3 then 
 					color = cc.c4b(0, 0, 255, 255)
 				end 	
@@ -491,10 +491,8 @@ local function LoginCommit2AccountServer(account, password)
 		if data.status == 0 then 
 			print("Login ok!", account, data.session)
 
-			if Storage.getString("account", "") == "" then 
+			if Storage.getString("account", "") ~= account then 
 				Storage.setString("account", account)
-			end 
-			if Storage.getString("password", "") == "" then
 				Storage.setString("password", password)
 			end
 
