@@ -25,6 +25,8 @@ local rankLayer
 local ranklist = {}
 local rankItems = {} -- 排行榜列表控件
 local rankLayouts = {}
+local rankPage = 1
+local maxPage = 0
 local myrank = 0
 local MyRankLabel
 local MusicFlag = true
@@ -132,7 +134,7 @@ local function showRankList(startindex, endIndex)
 	for i = startindex, endIndex do
 		local userdata = ranklist[i]
 		if userdata then 
-			local index = i%50 == 0 and 50 or i%50
+			local index = i%100 == 0 and 100 or i%100
 			local layout = rankLayouts[index]
 			if userdata.uid == UserProfile.uid then 
 				layout:setBackGroundColor(cc.c3b(0, 0, 0))
@@ -141,7 +143,7 @@ local function showRankList(startindex, endIndex)
 			end 
 
 			for j = 1, 4 do 
-				local label = rankItems[i][j]
+				local label = rankItems[index][j]
 				local color = cc.c4b(255, 255, 255, 255)
 				if i == 1 then 
 					color = cc.c4b(255, 0, 0, 255)
@@ -168,7 +170,9 @@ end
 
 local function GetRankList(startindex, endIndex)
 	startindex = startindex or 1 
-	endIndex = endIndex or 50
+	endIndex = endIndex or 100
+	rankPage = endIndex/100
+	if maxPage ~= 0 and rankPage > maxPage then return end -- 已经到底部了
 
 	local xhr = cc.XMLHttpRequest:new()	--http请求
 	xhr.responseType = cc.XMLHTTPREQUEST_RESPONSE_JSON	--请求类型
@@ -182,7 +186,7 @@ local function GetRankList(startindex, endIndex)
 		if data.status == 0 then 
 			for i, v in ipairs(data.lists) do 
 				ranklist[v.rank] = v
-				print("ranlist ", v.uid, v.rank, v.name, v.score)
+				print("ranklist ", v.uid, v.rank, v.name, v.score)
 				if v.uid == UserProfile.uid then 
 					myrank = v.rank
 					MyRankLabel:setString(tostring(myrank))
@@ -192,7 +196,9 @@ local function GetRankList(startindex, endIndex)
 					end	
 				end
 			end
-
+			if #data.lists < 100 then 
+				maxPage = rankPage
+			end 	
 			showRankList(startindex, endIndex)
 		end
 	end
@@ -263,6 +269,7 @@ function MainScene:AfterOperate(num, move)
 			if CurScore >= MaxScore then 
 				MaxScore = CurScore
 				CommitData2RankServer(MaxScore)
+				ranklist = {}
 				GetRankList() -- 排行榜数据刷新
 			end	
 
@@ -611,7 +618,7 @@ function MainScene:onCreate()
 	listView:setBounceEnabled(true);
 	listView:setItemsMargin(4)
 	
-	for i = 1, 50 do
+	for i = 1, 100 do
 		rankItems[i] = {}
 		local layout = ccui.Layout:create();
 		layout:setContentSize(cc.size(720, 62));
@@ -628,6 +635,17 @@ function MainScene:onCreate()
 		rankLayouts[i] = layout
 	end
 	rankLayer:addChild(listView);
+	listView:addScrollViewEventListener(function(sender, eventType)
+		if eventType == ccui.ScrollviewEventType.scrollToBottom then
+			-- 滑动到底部
+		elseif eventType == ccui.ScrollviewEventType.scrolling then
+			-- 滑动中
+		elseif eventType == ccui.ScrollviewEventType.bounceBottom then
+			-- print("滚动到底部 请求更新")
+			-- rankPage = rankPage + 1
+			-- GetRankList((rankPage-1)*100+1, rankPage*100) 
+        end
+	end)
 
 	local TipsBtn_Close = TipsLayer:getChildByName("btn_close")
 	TipsBtn_Close:addTouchEventListener(function(sender,eventType)
