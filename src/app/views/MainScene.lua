@@ -720,7 +720,17 @@ function MainScene:onCreate()
 	local resetBtn = ccui.Button:create("reset.png", "reset2.png", "reset.png")
 	resetBtn:addTouchEventListener(function(sender,eventType)
 		if eventType == ccui.TouchEventType.ended then
-			self:ResetBoard()
+			-- self:ResetBoard()
+
+			TipsLayer:getChildByName("Text_tips"):setString("确定要重新开始么？")
+			TipsLayer:setVisible(true)
+			local resetBtn = TipsLayer:getChildByName("btn_yes")
+			resetBtn:addTouchEventListener(function(sender,eventType)
+				if eventType == ccui.TouchEventType.ended then
+					self:ResetBoard()
+					TipsLayer:setVisible(false)
+				end
+			end)
 		end
     end)
 	resetBtn:setPosition(display.width - 60, display.height - 160)
